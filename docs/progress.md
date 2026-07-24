@@ -59,36 +59,44 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Published the results in `docs/apk-analysis-v1.3.13.md` and
   `docs/protocol.md`.
 
+### Non-root official-app capture
+
+- Enabled full Bluetooth HCI snoop logging on an unrooted Samsung SM-S926B.
+- Captured an official-app connection, device-information queries, density
+  change, and two identical print jobs.
+- Collected the report with `adb bugreport` and extracted the standard
+  `btsnoop_hci.log`.
+- Correlated the printer with classic HCI handle `0x0009`, RFCOMM DLCI 2, and
+  SPP UUID `00001101-0000-1000-8000-00805F9B34FB`.
+- Verified model `A2Y`, firmware `V1.06LY`, 384-dot width, compressed raster
+  framing, 80-dot trailing feed, and `AA 0D 0A` print completion.
+- Kept the bug report, snoop log, MAC address, serial number, and extracted
+  streams under ignored `private/captures/`.
+- Published the sanitized findings in
+  `docs/captures/official-app-print-2026-07-24.md`.
+
 ## Current checkpoint
 
-Static APK analysis of the printing path is complete. The following claims
-still require the physical printer and are deliberately marked as inferred or
-unknown:
+The official app's transport and normal print sequence are now verified.
+Remaining unknowns:
 
-- whether this official app build actually connects to this model over classic
-  SPP, as its static gates indicate;
-- the live FF00 service characteristic UUIDs and negotiated MTU/credits;
-- actual responses to model, version, battery, and status commands;
-- whether firmware `V1.06LY` reports model string `A2Y`;
-- the proprietary compressed raster algorithm; and
-- the exact physical margins and maximum reliable printable width.
+- the live FF00 BLE characteristic layout and negotiated MTU/credits;
+- the proprietary `codeESC` compressed-raster algorithm;
+- whether this firmware also accepts the uncompressed `GS v 0` envelope;
+- exact physical margins and maximum reliable printable width; and
+- behavior on indexed/label media rather than the current continuous roll.
 
-## Proposed next phase: non-root transport capture
+## Proposed next phase: PC discovery and minimal driver
 
-This phase requires explicit approval before work starts.
+This phase requires explicit approval before installing dependencies or
+sending commands from the PC.
 
-1. Add a Python project skeleton and a discovery-only CLI.
-2. Enumerate BLE advertisements, GATT services, characteristic properties,
-   MTU, and notifications without sending print data.
-3. Enable Android's Bluetooth HCI snoop-log developer option and collect an
-   `adb bugreport`; this does not require root.
-4. Capture one official-app status query and one tiny known-pattern print.
-5. Compare the official traffic with the existing Web Bluetooth
-   implementation.
-6. Present the capture and proposed protocol API before enabling writes in the
-   clean-room driver.
-
-If Android does not include the snoop log in a bug report on this device, the
-fallback is host-side BLE capture plus a narrowly scoped classic-SPP proxy or
-external Bluetooth sniffer. That fallback will be discussed before installing
-anything.
+1. Disconnect the official app so the printer has no active client.
+2. Add a Python project skeleton, protocol model, raster packer, and unit tests.
+3. Install `pyserial` and `bleak` only after approval.
+4. Enumerate the PC's Bluetooth devices and the printer's BLE GATT layout
+   without writes.
+5. Pair classic Bluetooth and identify the Windows COM port.
+6. Send only model, firmware, battery, and status queries first.
+7. Present those results before replaying a captured print or testing
+   uncompressed raster output.

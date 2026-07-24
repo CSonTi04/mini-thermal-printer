@@ -14,14 +14,16 @@ The target observed by this project is:
 ## Current status
 
 The static analysis of the official Android app
-`com.printer.lidloffice` version `1.3.13` is complete for the printing path.
-It recovered:
+`com.printer.lidloffice` version `1.3.13` is complete for the printing path,
+and a non-root Android HCI capture has verified the main conclusions. The work
+recovered and verified:
 
 - device-name matching and model selection;
-- classic Bluetooth SPP and BLE transport behavior;
+- official-app use of classic Bluetooth RFCOMM/SPP;
+- the live `A2Y` model and `V1.06LY` firmware responses;
 - BLE service/characteristic selection and credit-based flow control;
 - print-job lifecycle and command bytes;
-- uncompressed and compressed raster envelopes;
+- a live 384×37-dot compressed print transaction;
 - the app's resize, threshold, gamma, and error-diffusion pipeline; and
 - native-library exports, app permissions, network surfaces, and signing
   provenance.
@@ -29,11 +31,12 @@ It recovered:
 The findings are documented in:
 
 - [Static APK analysis](docs/apk-analysis-v1.3.13.md)
+- [Official-app transport capture](docs/captures/official-app-print-2026-07-24.md)
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
 
-Static findings are not presented as live hardware validation. The next
-milestone is a non-root capture and read-only device-discovery phase.
+Remaining generic SDK behavior is not presented as live hardware validation.
+The next milestone is PC-side discovery followed by a minimal Python driver.
 
 ## Repository policy
 

@@ -1,9 +1,10 @@
 # Protocol reference
 
 This document is a clean-room reference recovered from the official Android
-app `com.printer.lidloffice` version `1.3.13` (version code 176). It describes
-what the app is capable of sending. Commands are not considered verified on
-firmware `V1.06LY` until captured or tested against the physical printer.
+app `com.printer.lidloffice` version `1.3.13` (version code 176). A non-root
+Android HCI capture has verified the official transport, identification
+queries, and normal compressed print sequence on firmware `V1.06LY`. Generic
+SDK commands not seen in that capture remain unverified.
 
 ## Target profile
 
@@ -15,7 +16,10 @@ firmware `V1.06LY` until captured or tested against the physical printer.
 | Inheritance | `MiniPocketPrinter -> DP_D1 -> BaseNormalDevice` | Recovered |
 | Transport enum | `BLE_DUAL` | Recovered |
 | SDK per-device BLE gate | `false` | Recovered |
-| Print width | 384 dots | Recovered |
+| Official-app transport | Classic RFCOMM/SPP | Verified |
+| Live model response | `A2Y` | Verified |
+| Live firmware response | `V1.06LY` | Verified |
+| Print width | 384 dots | Verified |
 | Dot density | 8 dots/mm, approximately 203 dpi | Recovered |
 | Printable width | 48 mm (`384 / 8`) | Inferred |
 | Physical roll | approximately 56 mm | Observed |
@@ -39,11 +43,15 @@ Compression is enabled only when the decoded response is exactly `A2Y`.
 - Ordinary request timeout: typically 3 seconds
 - End-of-job timeout: 70 seconds
 
-The official-app selection logic strongly indicates classic SPP for this model:
-BLE use requires both a global SDK gate and a per-device gate, and both are
-statically `false`. No app caller of `setEnableBle(true)` and no matching custom
-printer override were found. This is an **inference about this app build**, not
-a claim that the printer lacks BLE.
+The official-app selection logic indicated classic SPP for this model: BLE use
+requires both a global SDK gate and a per-device gate, and both are statically
+`false`. A live HCI capture verified that `com.printer.lidloffice` opens the SPP
+UUID over classic Bluetooth. The printer separately advertises a BLE identity,
+so this is not a claim that the hardware lacks BLE.
+
+The captured connection used RFCOMM DLCI 2. Android's stack handled RFCOMM
+credit flow; application bytes begin after the RFCOMM credit octet and should
+not include that octet when reproducing commands through an OS serial port.
 
 ## BLE GATT transport
 
@@ -94,7 +102,28 @@ Write flow control:
 FF01 carries ordinary command responses and asynchronous device data. FF03 is
 reserved for credit and MTU events.
 
-## Mini Pocket Printer label-print lifecycle
+## Verified continuous-roll lifecycle
+
+The official app's normal `PrintActivity` path produced:
+
+```text
+10 FF 40                    query status
+10 FF F1 03                 enable/start print job
+00 00 00 00 00 00          wake-up prefix
+00 00 00 00 00 00          (12 zero bytes total)
+1F 10 00 30 00 25          compressed raster: 48 bytes wide, 37 rows
+00 00 00 D9 <217 bytes>     217-byte compressed payload
+1B 4A 50                    feed 80 dots
+10 FF F1 45                 stop/end print job
+```
+
+The printer returned `AA 0D 0A` after each completed job. Two captured jobs had
+identical 227-byte compressed frames.
+
+The normal path did not issue a paper-type command. It used the generic
+continuous-paper feed rather than `DP_D1`'s indexed-label positioning command.
+
+## Statically recovered label lifecycle
 
 `DP_D1` overrides the generic label path. One page is sent as:
 
@@ -109,7 +138,7 @@ reserved for credit and MTU events.
 ```
 
 The stop response is accepted when its first byte is `AA` or its decoded text
-starts with `OK`.
+starts with `OK`; live completion was `AA 0D 0A`.
 
 The generic continuous-paper path differs after the raster: it feeds
 `endLineDot` using `1B 4A n` and then stops the job. For a 384-dot device,
@@ -207,6 +236,20 @@ not change the default way, so its static path is `codeESC`.
 The compression algorithm itself remains **unknown**. It lives in the stripped
 ARM64 `libPrinterNative.so`. Uncompressed raster is consequently the first
 clean-room implementation target.
+
+The live printer returned `A2Y` and the official app sent:
+
+```text
+1F 10 00 30 00 25 00 00 00 D9 <217 compressed bytes>
+```
+
+This represents 384×37 one-bit pixels: 1,776 uncompressed raster bytes reduced
+to 217 compressed bytes. The two captured frames were identical:
+
+- complete 227-byte frame SHA-256:
+  `91FFAE2FAD7FA057660BEE9D62CE69D88DF65FFF66ED2CE2F0399A9943037CD4`
+- compressed-payload SHA-256:
+  `8E72234F7B247B067D2E4F08A0023B42190D6436BEE4DD23F32146B9267586F6`
 
 ## Grayscale extension
 

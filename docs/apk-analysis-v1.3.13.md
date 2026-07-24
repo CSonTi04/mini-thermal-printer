@@ -2,6 +2,11 @@
 
 Analysis date: 2026-07-24
 
+> Subsequent non-root HCI capture verified that the official app uses classic
+> RFCOMM/SPP, that this printer reports model `A2Y`, and that its normal print
+> path uses the recovered compressed envelope. See
+> `docs/captures/official-app-print-2026-07-24.md`.
+
 ## Executive result
 
 The official app's complete printing path for the Lidl TRONIC Mini Pocket
