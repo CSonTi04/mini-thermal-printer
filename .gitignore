@@ -1,0 +1,8 @@
+# Proprietary and device-derived reverse-engineering artifacts
+/private/
+/dumpsys.txt
+/pmpath.txt
+
+# Decompiler output
+/decompiled/
+/analysis-work/
