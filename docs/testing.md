@@ -53,16 +53,22 @@ moves paper. It will skip unless both consent flags are present:
   --live --allow-printing --printer-port COM7 -v
 ```
 
-BLE printing has the same separate consent requirement:
+The production-path BLE calibration test uses recovered `codeESC` compression,
+three-dot lines, a 96-row image, and 160 feed dots. It requires separate
+consent:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_compressed_print.py `
+  --live --allow-printing --printer-address <printer-address> -v
+```
+
+The separate uncompressed probe receives successful completion but renders only
+its first expected horizontal row. It is retained as a regression probe:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_print.py `
   --live --allow-printing --printer-address <printer-address> -v
 ```
-
-The uncompressed print probe currently receives successful completion but
-renders only its first expected horizontal row. It is retained as a regression
-probe, not as proof of production-quality printing.
 
 Standalone BLE feed uses a verified one-row all-white raster workaround:
 
@@ -71,9 +77,8 @@ Standalone BLE feed uses a verified one-row all-white raster workaround:
   --dots 160 --live --allow-printing
 ```
 
-The live print currently probes the unverified uncompressed `GS v 0` path. It
-must not be run unattended. A failed print may establish that firmware
-`V1.06LY` requires the proprietary compressed envelope.
+All live print tests must be attended so physical rendering can be compared
+with transport-level completion.
 
 ## CLI safety gates
 
@@ -83,7 +88,10 @@ The CLI mirrors the test safety model:
 tronic-printer info --port COM7 --live
 tronic-printer print-test --port COM7 --live --allow-printing
 tronic-printer ble-info <printer-address> --live
-tronic-printer ble-print-test <printer-address> --live --allow-printing
+tronic-printer ble-print-test <printer-address> --height 96 --line-width 3 `
+  --feed-dots 160 --live --allow-printing
+tronic-printer ble-print-test <printer-address> --encoding uncompressed `
+  --live --allow-printing
 tronic-printer ble-feed <printer-address> --dots 160 --live --allow-printing
 ```
 

@@ -92,17 +92,32 @@ class RasterImage:
         return cls(width=width, height=len(rows), data=bytes(packed))
 
     @classmethod
-    def test_pattern(cls, width: int = 384, height: int = 32) -> RasterImage:
+    def test_pattern(
+        cls,
+        width: int = 384,
+        height: int = 32,
+        line_width: int = 1,
+    ) -> RasterImage:
         """Create a deterministic border/crosshatch pattern for physical tests."""
         if width < 8 or height < 8:
             raise ValueError("test pattern must be at least 8 by 8 pixels")
+        if not 1 <= line_width <= min(width, height) // 2:
+            raise ValueError("line width does not fit inside the test pattern")
         rows: list[list[bool]] = []
         for y in range(height):
             row = []
             for x in range(width):
-                border = x in (0, width - 1) or y in (0, height - 1)
-                crosshair = x == width // 2 or y == height // 2
-                ticks = y < 8 and x % 16 == 0
+                border = (
+                    x < line_width
+                    or x >= width - line_width
+                    or y < line_width
+                    or y >= height - line_width
+                )
+                crosshair = (
+                    abs(x - width // 2) < line_width
+                    or abs(y - height // 2) < line_width
+                )
+                ticks = y < 8 and x % 16 < line_width
                 row.append(border or crosshair or ticks)
             rows.append(row)
         return cls.from_rows(rows)

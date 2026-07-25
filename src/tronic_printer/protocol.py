@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import zlib
+
 from tronic_printer.domain import ProtocolError, RasterImage
 
 QUERY_MODEL = bytes.fromhex("10 FF 20 F0")
@@ -78,6 +80,33 @@ def encode_uncompressed_raster(raster: RasterImage, mode: int = 0) -> bytes:
     x = raster.row_bytes.to_bytes(2, "little")
     y = raster.height.to_bytes(2, "little")
     return bytes((0x1D, 0x76, 0x30, mode)) + x + y + raster.data
+
+
+def compress_code_esc(data: bytes) -> bytes:
+    """Reproduce the native codeESC zlib stream exactly."""
+    compressor = zlib.compressobj(
+        level=zlib.Z_DEFAULT_COMPRESSION,
+        method=zlib.DEFLATED,
+        wbits=10,
+        memLevel=8,
+        strategy=zlib.Z_DEFAULT_STRATEGY,
+    )
+    return compressor.compress(data) + compressor.flush(zlib.Z_FINISH)
+
+
+def encode_compressed_raster(raster: RasterImage) -> bytes:
+    if raster.width > MAX_PRINT_WIDTH:
+        raise ValueError(f"raster exceeds the {MAX_PRINT_WIDTH}-dot print head")
+    if raster.row_bytes > 0xFFFF or raster.height > 0xFFFF:
+        raise ValueError("raster dimensions exceed the protocol envelope")
+    payload = compress_code_esc(raster.data)
+    return (
+        bytes((0x1F, 0x10))
+        + raster.row_bytes.to_bytes(2, "big")
+        + raster.height.to_bytes(2, "big")
+        + len(payload).to_bytes(4, "big")
+        + payload
+    )
 
 
 def is_success(response: bytes) -> bool:

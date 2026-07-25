@@ -26,6 +26,7 @@ recovered and verified:
 - a live 384×37-dot compressed print transaction;
 - a live PC BLE connection and read-only query session;
 - an acknowledged but incomplete uncompressed BLE raster probe;
+- byte-exact recovery of the native `codeESC` zlib codec;
 - the app's resize, threshold, gamma, and error-diffusion pipeline; and
 - native-library exports, app permissions, network surfaces, and signing
   provenance.
@@ -70,6 +71,10 @@ List serial ports without connecting to a device:
 
 Live access is explicitly gated. Read [test-rig documentation](docs/testing.md)
 before using `--live` or `--allow-printing`.
+
+Compressed `codeESC` output is the default because the live uncompressed probe
+rendered only its first expected row. The encoding remains explicitly
+selectable for regression work.
 
 ## Repository policy
 

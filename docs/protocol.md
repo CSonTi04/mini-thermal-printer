@@ -232,7 +232,7 @@ horizontal line instead of the expected multi-row border/crosshair. A later
 feed confirmed the rest was not hidden under the cover. Full uncompressed
 raster support therefore remains unverified.
 
-## Optional compressed raster
+## codeESC compressed raster
 
 When model query returns `A2Y`, the same one-bit raster payload is compressed
 and wrapped as:
@@ -244,11 +244,26 @@ and wrapped as:
 
 Compression way 0 calls native `Compress.codeESC`; way 1 calls
 `Compress.codeLihu`. The Mini Pocket Printer class enables compression but does
-not change the default way, so its static path is `codeESC`.
+not change the default way, so its path is `codeESC`.
 
-The compression algorithm itself remains **unknown**. It lives in the stripped
-ARM64 `libPrinterNative.so`. Recovering or independently reproducing this
-algorithm remains necessary for a reliable multi-row print path.
+ARM64 disassembly and a captured input/output vector establish that `codeESC`
+is a zlib-wrapped DEFLATE stream with these parameters:
+
+| zlib setting | Value |
+| --- | ---: |
+| Compression level | `Z_DEFAULT_COMPRESSION` (`-1`) |
+| Method | `Z_DEFLATED` (`8`) |
+| Window bits | `10` |
+| Memory level | `8` |
+| Strategy | `Z_DEFAULT_STRATEGY` (`0`) |
+| Flush | `Z_FINISH` (`4`) |
+
+The JNI wrapper at `0x9184` calls a shared encoder at `0x994C`. Its allocation
+helper at `0x9A30` computes zlib's `compressBound` expression
+`n + (n >> 12) + (n >> 14) + 11`. The encoder initializes an embedded zlib
+stream with `deflateInit2_`, finishes it, and returns the resulting bytes.
+`codeLihu` and `codeCPCL` call the same encoder with window bits 10;
+`codeTSPL` differs by using window bits 15.
 
 The live printer returned `A2Y` and the official app sent:
 
@@ -263,6 +278,13 @@ to 217 compressed bytes. The two captured frames were identical:
   `91FFAE2FAD7FA057660BEE9D62CE69D88DF65FFF66ED2CE2F0399A9943037CD4`
 - compressed-payload SHA-256:
   `8E72234F7B247B067D2E4F08A0023B42190D6436BEE4DD23F32146B9267586F6`
+
+Decompressing the payload with window bits 10 produces exactly 1,776 bytes
+with SHA-256
+`72D4FED9D387831DC6F3BEC1750372BDE59AEEBC25D0F186F2A8A754D44FF400`.
+Recompressing those bytes with the parameters above reproduces all 217 captured
+bytes and the existing compressed-payload hash. The clean-room Python driver
+uses this encoding by default.
 
 ## Grayscale extension
 

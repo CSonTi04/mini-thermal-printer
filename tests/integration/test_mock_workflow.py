@@ -16,5 +16,7 @@ def test_complete_mocked_operator_workflow() -> None:
     assert before.battery_percent == 90
     assert before.density == 1
     assert after.density == 2
-    assert printed.total_bytes == 4 + 12 + (8 + 48 * 32) + 3 + 4
+    job = printer.completed_jobs[0]
+    assert printed.total_bytes == sum(len(chunk) for chunk in job)
+    assert job[2].startswith(bytes.fromhex("1F 10 00 30 00 20"))
     assert len(printer.completed_jobs) == 1

@@ -122,16 +122,30 @@ Apache License 2.0 is the recommended license for the future clean-room code.
   one-row all-white raster followed by 160 feed dots moved paper and completed
   successfully, establishing a safe standalone-feed workaround.
 
+### Native codeESC recovery
+
+- Installed the user-approved AArch64 cross-binutils package in WSL.
+- Disassembled all four JNI compression wrappers and their shared encoder in
+  the stripped ARM64 `libPrinterNative.so`.
+- Identified `codeESC` as zlib-wrapped DEFLATE using default compression,
+  method 8, window bits 10, memory level 8, default strategy, and `Z_FINISH`.
+- Decompressed the captured 217-byte payload to the expected 1,776 raster bytes
+  and reproduced the native payload byte-for-byte with Python's standard zlib.
+- Added a privacy-safe captured regression vector and made `codeESC` the
+  driver's default raster encoding while retaining uncompressed mode for
+  diagnostics.
+- Verified 59 non-HIL tests and six HIL tests that skip without consent flags.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
 query path and feed workaround are verified. Windows has not created a classic
-SPP COM port, but BLE provides a working PC transport. Reliable multi-row
-printing now depends on recovering or reproducing `codeESC` compression.
+SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered
+and reproduced byte-for-byte; the next checkpoint is one separately approved
+compressed calibration print.
 
 Remaining unknowns:
 
-- the proprietary `codeESC` compressed-raster algorithm;
 - exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 
@@ -157,8 +171,8 @@ its live GATT layout is understood.
 8. After a separate print approval, print a small deterministic test pattern,
    photograph or inspect the physical result, and refine width, margins, feed,
    and timing.
-9. Continue native-library analysis to recover the proprietary compressed
-   raster algorithm, then add it as an optional encoding after it is verified.
+9. Recover the native compressed raster algorithm, validate it against the
+   captured vector, and make it the default after verification. **Completed.**
 10. Exercise the same driver on Debian, document host setup and known
     limitations, and commit each verified milestone so progress remains
     reviewable and reversible.

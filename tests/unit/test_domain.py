@@ -46,3 +46,11 @@ def test_test_pattern_is_deterministic() -> None:
 
     assert first == second
     assert len(first.data) == 48 * 32
+
+
+def test_test_pattern_supports_thicker_calibration_lines() -> None:
+    raster = RasterImage.test_pattern(384, 96, line_width=3)
+
+    assert raster.data[: 48 * 3] == bytes([0xFF]) * (48 * 3)
+    with pytest.raises(ValueError, match="line width"):
+        RasterImage.test_pattern(8, 8, line_width=5)

@@ -2,7 +2,13 @@ import pytest
 
 from tronic_printer.application import CommandBus, QueryBus, build_application
 from tronic_printer.domain import PrinterNotReady, RasterImage
-from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster, SetDensity
+from tronic_printer.messages import (
+    FeedPaper,
+    GetDeviceInfo,
+    PrintRaster,
+    RasterEncoding,
+    SetDensity,
+)
 from tronic_printer.testing import EmulatedPrinterTransport
 
 
@@ -36,12 +42,12 @@ def test_print_command_builds_complete_continuous_roll_job() -> None:
     result = app.commands.execute(PrintRaster(raster, feed_dots=80))
 
     assert result.completion == b"\xAA\r\n"
-    assert result.raster_bytes == 8 + 48 * 16
+    assert result.raster_bytes < 8 + 48 * 16
     assert len(transport.completed_jobs) == 1
     job = transport.completed_jobs[0]
     assert job[0] == bytes.fromhex("10 FF F1 03")
     assert job[1] == bytes(12)
-    assert job[2].startswith(bytes.fromhex("1D 76 30 00 30 00 10 00"))
+    assert job[2].startswith(bytes.fromhex("1F 10 00 30 00 10"))
     assert job[3] == bytes.fromhex("1B 4A 50")
     assert job[4] == bytes.fromhex("10 FF F1 45")
 
@@ -53,6 +59,20 @@ def test_print_command_honors_job_mode() -> None:
     app.commands.execute(PrintRaster(RasterImage.test_pattern(), job_mode=7))
 
     assert transport.writes[0] == bytes.fromhex("10 FF F1 07")
+
+
+def test_uncompressed_encoding_remains_available_for_regression_probes() -> None:
+    transport = EmulatedPrinterTransport()
+    app = build_application(transport)
+
+    app.commands.execute(
+        PrintRaster(
+            RasterImage.test_pattern(),
+            encoding=RasterEncoding.UNCOMPRESSED,
+        )
+    )
+
+    assert transport.completed_jobs[0][2].startswith(bytes.fromhex("1D 76 30 00"))
 
 
 def test_feed_uses_verified_all_white_raster_lifecycle() -> None:

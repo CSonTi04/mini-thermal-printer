@@ -74,6 +74,27 @@ def test_print_with_both_flags_uses_mock_printer(
     assert result == 0
     assert json.loads(capsys.readouterr().out)["completion"] == "aa 0d 0a"
     assert len(printer.completed_jobs) == 1
+    assert printer.completed_jobs[0][2].startswith(bytes.fromhex("1F 10"))
+
+
+def test_ble_print_can_select_uncompressed_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    cli.main(
+        [
+            "ble-print-test",
+            "mock",
+            "--live",
+            "--allow-printing",
+            "--encoding",
+            "uncompressed",
+        ]
+    )
+
+    assert printer.completed_jobs[0][2].startswith(bytes.fromhex("1D 76 30"))
 
 
 def test_ble_scan_formats_discovered_devices(

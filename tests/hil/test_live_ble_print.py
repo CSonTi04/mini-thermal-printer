@@ -2,7 +2,7 @@ import pytest
 
 from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
-from tronic_printer.messages import PrintRaster
+from tronic_printer.messages import PrintRaster, RasterEncoding
 from tronic_printer.ports import PrinterTransport
 
 
@@ -13,7 +13,10 @@ def test_live_ble_uncompressed_probe_is_acknowledged(
     printing_allowed: None,
 ) -> None:
     result = build_application(hil_ble_transport).commands.execute(
-        PrintRaster(RasterImage.test_pattern(384, 32))
+        PrintRaster(
+            RasterImage.test_pattern(384, 32),
+            encoding=RasterEncoding.UNCOMPRESSED,
+        )
     )
 
     assert result.completion[0] == 0xAA or result.completion.startswith(b"OK")

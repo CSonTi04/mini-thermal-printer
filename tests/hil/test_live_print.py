@@ -8,7 +8,7 @@ from tronic_printer.ports import PrinterTransport
 
 @pytest.mark.hil
 @pytest.mark.printing
-def test_live_uncompressed_test_pattern(
+def test_live_code_esc_test_pattern(
     hil_transport: PrinterTransport,
     printing_allowed: None,
 ) -> None:

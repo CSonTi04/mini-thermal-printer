@@ -24,6 +24,7 @@ from tronic_printer.messages import (
     GetStatus,
     PrintRaster,
     PrintResult,
+    RasterEncoding,
     SetDensity,
 )
 from tronic_printer.ports import PrinterTransport
@@ -114,14 +115,25 @@ class PrinterCommandHandlers:
         # raster-less job unfinished. One all-white row satisfies the job
         # lifecycle without activating any print-head dots.
         blank_row = RasterImage(protocol.MAX_PRINT_WIDTH, 1, bytes(48))
-        self.print_raster(PrintRaster(blank_row, feed_dots=command.dots))
+        self.print_raster(
+            PrintRaster(
+                blank_row,
+                feed_dots=command.dots,
+                encoding=RasterEncoding.UNCOMPRESSED,
+            )
+        )
 
     def print_raster(self, command: PrintRaster) -> PrintResult:
         status = self.queries.status(GetStatus())
         if not status.can_print:
             raise PrinterNotReady(f"printer status 0x{status.raw:02X} prevents printing")
 
-        raster_frame = protocol.encode_uncompressed_raster(command.raster)
+        if command.encoding is RasterEncoding.CODE_ESC:
+            raster_frame = protocol.encode_compressed_raster(command.raster)
+        elif command.encoding is RasterEncoding.UNCOMPRESSED:
+            raster_frame = protocol.encode_uncompressed_raster(command.raster)
+        else:
+            raise ValueError(f"unsupported raster encoding: {command.encoding}")
         chunks = (
             protocol.start_job(command.job_mode),
             protocol.WAKE_PREFIX,

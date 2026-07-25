@@ -12,7 +12,7 @@ from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
-from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster
+from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster, RasterEncoding
 
 
 def _require(flag: bool, message: str) -> None:
@@ -58,6 +58,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that activating the head and moving paper is allowed",
     )
     ble_print.add_argument("--height", type=int, default=32)
+    ble_print.add_argument("--line-width", type=int, default=1)
+    ble_print.add_argument("--feed-dots", type=int, default=80)
+    ble_print.add_argument(
+        "--encoding",
+        choices=[encoding.value for encoding in RasterEncoding],
+        default=RasterEncoding.CODE_ESC.value,
+    )
 
     ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
     ble_feed.add_argument("address")
@@ -81,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="confirm that activating the head and moving paper is allowed",
             )
             command.add_argument("--height", type=int, default=32)
+            command.add_argument("--line-width", type=int, default=1)
+            command.add_argument("--feed-dots", type=int, default=80)
+            command.add_argument(
+                "--encoding",
+                choices=[encoding.value for encoding in RasterEncoding],
+                default=RasterEncoding.CODE_ESC.value,
+            )
     return parser
 
 
@@ -121,8 +135,17 @@ def main(argv: list[str] | None = None) -> int:
         _require(args.allow_printing, "refusing to print without --allow-printing")
         try:
             with BleTransport(args.address) as transport:
-                pattern = RasterImage.test_pattern(height=args.height)
-                result = build_application(transport).commands.execute(PrintRaster(pattern))
+                pattern = RasterImage.test_pattern(
+                    height=args.height,
+                    line_width=args.line_width,
+                )
+                result = build_application(transport).commands.execute(
+                    PrintRaster(
+                        pattern,
+                        feed_dots=args.feed_dots,
+                        encoding=RasterEncoding(args.encoding),
+                    )
+                )
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE print failed: {error}") from error
         _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
@@ -148,8 +171,17 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.action == "print-test":
             _require(args.allow_printing, "refusing to print without --allow-printing")
-            pattern = RasterImage.test_pattern(height=args.height)
-            result = app.commands.execute(PrintRaster(pattern))
+            pattern = RasterImage.test_pattern(
+                height=args.height,
+                line_width=args.line_width,
+            )
+            result = app.commands.execute(
+                PrintRaster(
+                    pattern,
+                    feed_dots=args.feed_dots,
+                    encoding=RasterEncoding(args.encoding),
+                )
+            )
             _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
             return 0
     return _unreachable(args.action)

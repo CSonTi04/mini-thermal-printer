@@ -443,10 +443,13 @@ Relevant exports:
 - `decompressionString2`
 - `reverseBits`
 
-Strings also show zlib-style error messages and a GZIPTok printer raster
-descriptor, but static strings alone do not prove that `codeESC` is ordinary
-gzip. The proprietary compression format remains unknown pending controlled
-input/output vectors or deeper disassembly.
+Cross-disassembly performed after the initial static report resolved the
+compression path. The `codeESC` wrapper at `0x9184` calls an embedded zlib
+encoder at `0x994C` with default compression, DEFLATE method 8, window bits 10,
+memory level 8, and default strategy. Its helper at `0x9A30` is zlib's
+`compressBound` calculation. A captured 217-byte payload decompresses to the
+expected 1,776 raster bytes and recompresses byte-for-byte with those settings.
+This is a zlib-wrapped DEFLATE stream, not gzip and not a proprietary codec.
 
 ## Implementation consequences
 
@@ -455,13 +458,13 @@ A clean-room driver should initially:
 1. treat the printer as 384 dots/48 bytes per row;
 2. implement the recovered image and text preprocessing modes independently;
 3. pack one-bit rows MSB-first;
-4. use uncompressed `GS v 0`;
+4. use recovered `codeESC` zlib compression for reliable multi-row output;
 5. implement both SPP and BLE as transport adapters;
 6. discover BLE characteristics by service/property rules rather than assuming
    FF02;
 7. keep BLE credit/MTU state separate from command framing; and
-8. enable compression only after a verified `A2Y` response and known-good test
-   vectors.
+8. retain uncompressed `GS v 0` only as a diagnostic path because live firmware
+   rendered only the first expected row.
 
 Potentially state-changing commands such as time, shutdown, density, paper
 mode, recovery, firmware update, or arbitrary raw command writes should not be
@@ -492,14 +495,8 @@ so the analysis can be reproduced:
 
 ## Remaining unknowns
 
-Static APK analysis is complete, but the reverse engineering project is not:
-
-- live transport chosen by the official app;
-- actual GATT UUID/property layout and negotiated BLE values;
-- device response framing and asynchronous status frames;
-- model string returned by this firmware;
-- compressed raster algorithm;
-- physical margins and thermal/density behavior; and
-- command differences, if any, between continuous roll and indexed media.
-
-Those belong to the next, separately approved non-root capture phase.
+Subsequent non-root capture and PC HIL work resolved the official transport,
+live GATT layout, device responses, model, continuous-roll lifecycle, and
+compressed raster algorithm. Remaining hardware questions are exact physical
+margins, thermal/density behavior, and command differences between continuous
+roll and indexed media.

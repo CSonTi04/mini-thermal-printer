@@ -120,10 +120,14 @@ Confirmed:
 - the continuous-roll path feeds 80 dots; and
 - print completion begins with `AA`.
 
-Still unknown:
+Unknown at capture time, but resolved by later PC analysis:
 
-- `codeESC` compression algorithm;
-- whether the printer also accepts uncompressed `GS v 0`;
-- live BLE GATT characteristic layout;
-- exact physical margins; and
-- indexed-label behavior.
+- `codeESC` is zlib-wrapped DEFLATE with window bits 10 and is reproduced
+  byte-for-byte by the Python driver;
+- the live BLE GATT layout is FF01 notify, FF02 write, and FF03 control; and
+- uncompressed `GS v 0` is acknowledged but renders only the first expected row
+  in the current probe.
+
+Exact physical margins and indexed-label behavior remain unknown. See the
+[protocol reference](../protocol.md) and
+[PC BLE print report](pc-ble-print-2026-07-25.md) for the later evidence.

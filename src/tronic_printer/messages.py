@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from tronic_printer.domain import RasterImage
 
@@ -47,11 +48,17 @@ class FeedPaper:
     dots: int
 
 
+class RasterEncoding(StrEnum):
+    CODE_ESC = "code-esc"
+    UNCOMPRESSED = "uncompressed"
+
+
 @dataclass(frozen=True, slots=True)
 class PrintRaster:
     raster: RasterImage
     feed_dots: int = 80
     job_mode: int = 3
+    encoding: RasterEncoding = RasterEncoding.CODE_ESC
 
 
 @dataclass(frozen=True, slots=True)
