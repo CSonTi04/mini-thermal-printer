@@ -60,6 +60,17 @@ BLE printing has the same separate consent requirement:
   --live --allow-printing --printer-address <printer-address> -v
 ```
 
+The uncompressed print probe currently receives successful completion but
+renders only its first expected horizontal row. It is retained as a regression
+probe, not as proof of production-quality printing.
+
+Standalone BLE feed uses a verified one-row all-white raster workaround:
+
+```powershell
+.venv\Scripts\tronic-printer.exe ble-feed <printer-address> `
+  --dots 160 --live --allow-printing
+```
+
 The live print currently probes the unverified uncompressed `GS v 0` path. It
 must not be run unattended. A failed print may establish that firmware
 `V1.06LY` requires the proprietary compressed envelope.
@@ -73,6 +84,7 @@ tronic-printer info --port COM7 --live
 tronic-printer print-test --port COM7 --live --allow-printing
 tronic-printer ble-info <printer-address> --live
 tronic-printer ble-print-test <printer-address> --live --allow-printing
+tronic-printer ble-feed <printer-address> --dots 160 --live --allow-printing
 ```
 
 Omitting either required flag stops before the corresponding hardware action.

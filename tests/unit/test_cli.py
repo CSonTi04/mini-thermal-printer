@@ -193,3 +193,40 @@ def test_ble_print_with_both_flags_uses_shared_application(
     assert result == 0
     assert json.loads(capsys.readouterr().out)["completion"] == "aa 0d 0a"
     assert len(printer.completed_jobs) == 1
+
+
+def test_ble_feed_requires_both_consent_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-feed", "mock"])
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main(["ble-feed", "mock", "--live"])
+
+    assert printer.writes == []
+
+
+def test_ble_feed_uses_white_raster_workaround(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    assert (
+        cli.main(
+            [
+                "ble-feed",
+                "mock",
+                "--dots",
+                "160",
+                "--live",
+                "--allow-printing",
+            ]
+        )
+        == 0
+    )
+
+    assert json.loads(capsys.readouterr().out) == {"fed_dots": 160, "fed_mm": 20.0}
+    assert printer.completed_jobs[0][2][8:] == bytes(48)

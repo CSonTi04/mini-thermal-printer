@@ -8,7 +8,7 @@ from tronic_printer.ports import PrinterTransport
 
 @pytest.mark.hil
 @pytest.mark.printing
-def test_live_ble_uncompressed_test_pattern(
+def test_live_ble_uncompressed_probe_is_acknowledged(
     hil_ble_transport: PrinterTransport,
     printing_allowed: None,
 ) -> None:

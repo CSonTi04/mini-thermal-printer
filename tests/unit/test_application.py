@@ -2,7 +2,7 @@ import pytest
 
 from tronic_printer.application import CommandBus, QueryBus, build_application
 from tronic_printer.domain import PrinterNotReady, RasterImage
-from tronic_printer.messages import GetDeviceInfo, PrintRaster, SetDensity
+from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster, SetDensity
 from tronic_printer.testing import EmulatedPrinterTransport
 
 
@@ -53,6 +53,18 @@ def test_print_command_honors_job_mode() -> None:
     app.commands.execute(PrintRaster(RasterImage.test_pattern(), job_mode=7))
 
     assert transport.writes[0] == bytes.fromhex("10 FF F1 07")
+
+
+def test_feed_uses_verified_all_white_raster_lifecycle() -> None:
+    transport = EmulatedPrinterTransport()
+    app = build_application(transport)
+
+    app.commands.execute(FeedPaper(160))
+
+    job = transport.completed_jobs[0]
+    assert job[2][:8] == bytes.fromhex("1D 76 30 00 30 00 01 00")
+    assert job[2][8:] == bytes(48)
+    assert job[3] == bytes.fromhex("1B 4A A0")
 
 
 @pytest.mark.parametrize("unsafe_status", [0x02, 0x04, 0x10, 0x40])

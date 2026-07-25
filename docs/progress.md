@@ -88,8 +88,8 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Enforced `--live` for physical access and `--allow-printing` in addition for
   print-head or paper-moving tests.
 - Created the approved local `.venv` and installed the project dependencies.
-- Verified 51 non-HIL tests with 88% aggregate package coverage and clean Ruff
-  checks. Verified that all four HIL tests skip without consent flags.
+- Verified 54 non-HIL tests with 87% aggregate package coverage and clean Ruff
+  checks. Verified that all five HIL tests skip without consent flags.
 
 ### PC BLE discovery and read-only HIL
 
@@ -106,18 +106,32 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Passed the dedicated read-only BLE HIL test. No print, feed, or setting change
   was transmitted.
 
+### PC BLE uncompressed print HIL
+
+- Received separate approval for one minimal paper-moving test.
+- Sent a 384×32 one-bit border/crosshair through the uncompressed `GS v 0`
+  envelope, followed by the captured 80-dot feed.
+- Received completion `AA 0D 0A`; the gated BLE transport-level HIL assertion
+  passed.
+- Physically observed only one fine horizontal line rather than the expected
+  multi-row border/crosshair. A later 20 mm feed confirmed no additional output
+  was hidden by the cover.
+- Classified uncompressed multi-row support as unverified despite the success
+  response; native compression remains the reliable target.
+- Verified that bare feed is ignored and a job without raster times out. A
+  one-row all-white raster followed by 160 feed dots moved paper and completed
+  successfully, establishing a safe standalone-feed workaround.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
-read-only path are both verified. Windows has not created a classic SPP COM
-port, but BLE provides a working PC transport. The next live checkpoint is a
-separately approved, minimal uncompressed test pattern over BLE. No PC print or
-paper-feed command has yet been sent.
+query path and feed workaround are verified. Windows has not created a classic
+SPP COM port, but BLE provides a working PC transport. Reliable multi-row
+printing now depends on recovering or reproducing `codeESC` compression.
 
 Remaining unknowns:
 
 - the proprietary `codeESC` compressed-raster algorithm;
-- whether this firmware also accepts the uncompressed `GS v 0` envelope;
 - exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 

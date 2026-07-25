@@ -12,7 +12,7 @@ from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
-from tronic_printer.messages import GetDeviceInfo, PrintRaster
+from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster
 
 
 def _require(flag: bool, message: str) -> None:
@@ -58,6 +58,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that activating the head and moving paper is allowed",
     )
     ble_print.add_argument("--height", type=int, default=32)
+
+    ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
+    ble_feed.add_argument("address")
+    ble_feed.add_argument("--dots", type=int, default=80)
+    ble_feed.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_feed.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that moving paper is allowed",
+    )
 
     for name in ("info", "print-test"):
         command = subparsers.add_parser(name)
@@ -116,6 +126,16 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE print failed: {error}") from error
         _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
+        return 0
+    if args.action == "ble-feed":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to move paper without --allow-printing")
+        try:
+            with BleTransport(args.address) as transport:
+                build_application(transport).commands.execute(FeedPaper(args.dots))
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE feed failed: {error}") from error
+        _print_json({"fed_dots": args.dots, "fed_mm": args.dots / 8})
         return 0
 
     with _serial_transport(args) as transport:

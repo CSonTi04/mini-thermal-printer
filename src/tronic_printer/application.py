@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
 from tronic_printer import protocol
-from tronic_printer.domain import DeviceInfo, PrinterNotReady, PrinterStatus, ProtocolError
+from tronic_printer.domain import (
+    DeviceInfo,
+    PrinterNotReady,
+    PrinterStatus,
+    ProtocolError,
+    RasterImage,
+)
 from tronic_printer.messages import (
     FeedPaper,
     GetBattery,
@@ -104,7 +110,11 @@ class PrinterCommandHandlers:
             raise ProtocolError(f"set-density rejected: {response.hex(' ')}")
 
     def feed_paper(self, command: FeedPaper) -> None:
-        self.transport.write(protocol.feed_dots(command.dots))
+        # Firmware V1.06LY ignores feed outside a raster job and leaves a
+        # raster-less job unfinished. One all-white row satisfies the job
+        # lifecycle without activating any print-head dots.
+        blank_row = RasterImage(protocol.MAX_PRINT_WIDTH, 1, bytes(48))
+        self.print_raster(PrintRaster(blank_row, feed_dots=command.dots))
 
     def print_raster(self, command: PrintRaster) -> PrintResult:
         status = self.queries.status(GetStatus())

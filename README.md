@@ -25,6 +25,7 @@ recovered and verified:
 - print-job lifecycle and command bytes;
 - a live 384×37-dot compressed print transaction;
 - a live PC BLE connection and read-only query session;
+- an acknowledged but incomplete uncompressed BLE raster probe;
 - the app's resize, threshold, gamma, and error-diffusion pipeline; and
 - native-library exports, app permissions, network surfaces, and signing
   provenance.
@@ -34,6 +35,7 @@ The findings are documented in:
 - [Static APK analysis](docs/apk-analysis-v1.3.13.md)
 - [Official-app transport capture](docs/captures/official-app-print-2026-07-24.md)
 - [PC BLE discovery and read-only queries](docs/captures/pc-ble-2026-07-25.md)
+- [PC BLE uncompressed print](docs/captures/pc-ble-print-2026-07-25.md)
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)

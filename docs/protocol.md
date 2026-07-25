@@ -226,6 +226,12 @@ Default output uses the ESC/POS `GS v 0` envelope:
 For a 384-dot row, `x = 48` bytes. A 384 by 100 image therefore has an 8-byte
 header followed by 4,800 raster bytes.
 
+A live PC BLE test on firmware `V1.06LY` acknowledged this envelope for a
+384×32 raster and returned `AA 0D 0A`, but physically rendered only one thin
+horizontal line instead of the expected multi-row border/crosshair. A later
+feed confirmed the rest was not hidden under the cover. Full uncompressed
+raster support therefore remains unverified.
+
 ## Optional compressed raster
 
 When model query returns `A2Y`, the same one-bit raster payload is compressed
@@ -241,8 +247,8 @@ Compression way 0 calls native `Compress.codeESC`; way 1 calls
 not change the default way, so its static path is `codeESC`.
 
 The compression algorithm itself remains **unknown**. It lives in the stripped
-ARM64 `libPrinterNative.so`. Uncompressed raster is consequently the first
-clean-room implementation target.
+ARM64 `libPrinterNative.so`. Recovering or independently reproducing this
+algorithm remains necessary for a reliable multi-row print path.
 
 The live printer returned `A2Y` and the official app sent:
 
