@@ -1,0 +1,26 @@
+{
+  "device": {
+    "model": "A2Y",
+    "firmware": "V1.06LY",
+    "battery_percent": [90, 92],
+    "density_before": 1,
+    "density_after": 2,
+    "status": 0
+  },
+  "exchanges": [
+    {"request": "10 ff 20 f0", "response_ascii": "A2Y"},
+    {"request": "10 ff 20 f1", "response_ascii": "V1.06LY"},
+    {"request": "10 ff 50 f1", "response_hex": "00 5a"},
+    {"request": "10 ff 40", "response_hex": "00"},
+    {"request": "10 ff 10 00 02", "response_ascii": "OK"},
+    {"request": "10 ff 11", "response_hex": "02 0c 10"}
+  ],
+  "print": {
+    "width_dots": 384,
+    "width_bytes": 48,
+    "height": 37,
+    "compressed_payload_bytes": 217,
+    "trailing_feed_dots": 80,
+    "completion_hex": "aa 0d 0a"
+  }
+}

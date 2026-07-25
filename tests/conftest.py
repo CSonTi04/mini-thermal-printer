@@ -1,0 +1,36 @@
+from collections.abc import Iterator
+
+import pytest
+
+from tronic_printer.infrastructure.serial import SerialTransport
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("printer hardware-in-the-loop")
+    group.addoption("--live", action="store_true", help="allow access to a physical printer")
+    group.addoption("--allow-printing", action="store_true", help="allow paper/head activation")
+    group.addoption("--printer-port", help="Bluetooth SPP serial port, for example COM7")
+    group.addoption("--printer-baudrate", type=int, default=115_200)
+
+
+@pytest.fixture
+def hil_transport(request: pytest.FixtureRequest) -> Iterator[SerialTransport]:
+    if not request.config.getoption("--live"):
+        pytest.skip("requires explicit --live consent")
+    port = request.config.getoption("--printer-port")
+    if not port:
+        pytest.skip("requires --printer-port")
+    transport = SerialTransport(
+        port,
+        baudrate=request.config.getoption("--printer-baudrate"),
+    )
+    try:
+        yield transport
+    finally:
+        transport.close()
+
+
+@pytest.fixture
+def printing_allowed(request: pytest.FixtureRequest) -> None:
+    if not request.config.getoption("--allow-printing"):
+        pytest.skip("requires separate --allow-printing consent")

@@ -1,0 +1,8 @@
+bleak<2,>=0.22
+Pillow<13,>=10
+pyserial<4,>=3.5
+
+[dev]
+pytest<10,>=8
+pytest-cov<8,>=5
+ruff<1,>=0.9

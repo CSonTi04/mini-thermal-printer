@@ -34,9 +34,38 @@ The findings are documented in:
 - [Official-app transport capture](docs/captures/official-app-print-2026-07-24.md)
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
+- [Mock and hardware-in-the-loop test rigs](docs/testing.md)
+- [Driver architecture](docs/architecture.md)
 
 Remaining generic SDK behavior is not presented as live hardware validation.
-The next milestone is PC-side discovery followed by a minimal Python driver.
+The first Python implementation is structured around CQRS messages and a
+transport-independent application core. A CLI is the initial presentation
+adapter; GUI and web interfaces can reuse the same command/query buses without
+depending on serial or Bluetooth details.
+
+## Python development
+
+Create an environment and install the package with its test dependencies:
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+Run the mocked test rig, which performs no hardware access:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -m "not hil"
+```
+
+List serial ports without connecting to a device:
+
+```powershell
+.venv\Scripts\tronic-printer.exe ports
+```
+
+Live access is explicitly gated. Read [test-rig documentation](docs/testing.md)
+before using `--live` or `--allow-printing`.
 
 ## Repository policy
 

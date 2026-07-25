@@ -1,6 +1,6 @@
 # Progress and approval log
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Project decisions
 
@@ -26,7 +26,7 @@ Apache License 2.0 is the recommended license for the future clean-room code.
   work directories.
 - Confirmed the proprietary APK splits and local analysis artifacts are
   ignored.
-- Nothing has been staged or committed.
+- Committed the static-analysis and official-app capture milestones separately.
 
 ### Device/app acquisition
 
@@ -75,9 +75,29 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Published the sanitized findings in
   `docs/captures/official-app-print-2026-07-24.md`.
 
+### Local Python implementation and test rigs
+
+- Created a Python 3.11+ package with a transport-independent domain and CQRS
+  command/query buses.
+- Added verified protocol encoders/decoders, 384-dot one-bit raster packing,
+  image conversion, classic SPP serial transport, and read-only BLE discovery.
+- Added a CLI designed as a thin adapter so future GUI and web interfaces can
+  reuse the same application core.
+- Added scripted and stateful mock transports, sanitized captured-session test
+  data, unit tests, an integration workflow, and separately gated HIL tests.
+- Enforced `--live` for physical access and `--allow-printing` in addition for
+  print-head or paper-moving tests.
+- Created the approved local `.venv` and installed the project dependencies.
+- Verified 44 non-HIL tests with 88% aggregate package coverage and clean Ruff
+  checks. Verified that both HIL tests skip without consent flags.
+
 ## Current checkpoint
 
-The official app's transport and normal print sequence are now verified.
+The official app's transport and normal print sequence are verified, and the
+mock-backed Python implementation is ready for PC-side discovery. Serial-port
+enumeration currently returns no ports, so Windows pairing is the next live
+checkpoint. No PC command has yet been sent to the physical printer.
+
 Remaining unknowns:
 
 - the live FF00 BLE characteristic layout and negotiated MTU/credits;
@@ -86,17 +106,39 @@ Remaining unknowns:
 - exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 
-## Proposed next phase: PC discovery and minimal driver
+## Agreed next phase: PC discovery and Python driver
 
-This phase requires explicit approval before installing dependencies or
-sending commands from the PC.
+The official app uses classic Bluetooth RFCOMM/SPP, so that is the primary
+driver path. BLE discovery remains a secondary, read-only investigation until
+its live GATT layout is understood.
 
-1. Disconnect the official app so the printer has no active client.
-2. Add a Python project skeleton, protocol model, raster packer, and unit tests.
-3. Install `pyserial` and `bleak` only after approval.
-4. Enumerate the PC's Bluetooth devices and the printer's BLE GATT layout
-   without writes.
-5. Pair classic Bluetooth and identify the Windows COM port.
-6. Send only model, firmware, battery, and status queries first.
-7. Present those results before replaying a captured print or testing
-   uncompressed raster output.
+1. Disconnect the phone from the printer while leaving the printer powered on.
+2. Add a Python project skeleton with protocol encoding, serial transport, a
+   command-line interface, raster packing, and unit tests.
+3. Create a repository-local `.venv` and install `pyserial`, `bleak`, and
+   `pytest` only after explicit approval.
+4. Enumerate the PC's Bluetooth devices and inspect the printer's BLE
+   advertisement and GATT layout without writes.
+5. Pair the printer over classic Bluetooth and identify its outgoing Windows
+   COM port.
+6. After explicit approval, send only read-only model, firmware, battery,
+   density, and status queries.
+7. Implement uncompressed 384-dot raster printing first, using the already
+   understood `GS v 0` format.
+8. After a separate print approval, print a small deterministic test pattern,
+   photograph or inspect the physical result, and refine width, margins, feed,
+   and timing.
+9. Continue native-library analysis to recover the proprietary compressed
+   raster algorithm, then add it as an optional encoding after it is verified.
+10. Exercise the same driver on Debian, document host setup and known
+    limitations, and commit each verified milestone so progress remains
+    reviewable and reversible.
+
+### Approval gates
+
+- **Dependency gate:** approval is required before creating the environment and
+  downloading `pyserial`, `bleak`, and `pytest`.
+- **Query gate:** approval is required before the PC transmits even read-only
+  commands to the printer.
+- **Print gate:** separate approval is required before sending raster data,
+  feeding paper, or replaying any captured job.
