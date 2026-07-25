@@ -72,6 +72,32 @@ def test_prepare_image_writes_exact_preview_without_hardware(
         assert set(rendered.tobytes()) <= {0, 255}
 
 
+def test_prepare_showcase_writes_four_labeled_pages_without_hardware(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.png"
+    output_dir = tmp_path / "showcase"
+    Image.new("RGB", (16, 16), "gray").save(source)
+    monkeypatch.setattr(
+        cli,
+        "BleTransport",
+        lambda *_args, **_kwargs: pytest.fail("prepare-showcase opened Bluetooth"),
+    )
+
+    assert cli.main(["prepare-showcase", str(source), "-o", str(output_dir)]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert [page["slug"] for page in output] == [
+        "floyd-photo",
+        "ordered-newsprint",
+        "gritty-noir",
+        "outline-sketch",
+    ]
+    assert len(list(output_dir.glob("*.png"))) == 4
+
+
 def test_info_refuses_hardware_without_live() -> None:
     with pytest.raises(SystemExit, match="--live"):
         cli.main(["info", "--port", "COM7"])

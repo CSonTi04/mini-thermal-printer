@@ -29,6 +29,7 @@ from tronic_printer.preprocessing import (
     build_effect_registry,
     load_prepared_image,
 )
+from tronic_printer.showcase import load_showcase_pages
 
 
 def _require(flag: bool, message: str) -> None:
@@ -133,6 +134,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_preparation_options(prepare)
     prepare.add_argument("--output", "-o", required=True, help="destination PNG preview")
 
+    showcase = subparsers.add_parser(
+        "prepare-showcase",
+        help="build the four labeled style pages without hardware access",
+    )
+    showcase.add_argument("image", help="source image used for all four recipes")
+    showcase.add_argument("--output-dir", "-o", required=True)
+
     scan = subparsers.add_parser("ble-scan", help="scan for matching BLE advertisements")
     scan.add_argument("--timeout", type=float, default=5.0)
 
@@ -217,6 +225,20 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as error:
             raise SystemExit(f"cannot save preview: {error}") from error
         _print_json(_prepared_summary(prepared) | {"preview": str(Path(args.output))})
+        return 0
+    if args.action == "prepare-showcase":
+        output_dir = Path(args.output_dir)
+        try:
+            pages = load_showcase_pages(args.image)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            summaries: list[dict[str, object]] = []
+            for index, page in enumerate(pages, start=1):
+                destination = output_dir / f"{index:02d}-{page.recipe.slug}.png"
+                page.preview.save(destination)
+                summaries.append(page.summary() | {"preview": str(destination)})
+        except (OSError, TypeError, ValueError) as error:
+            raise SystemExit(f"cannot prepare showcase: {error}") from error
+        _print_json(summaries)
         return 0
     if args.action == "ble-scan":
         try:

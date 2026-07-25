@@ -44,6 +44,18 @@ The JSON result includes source and raster dimensions, estimated printed
 height, black-pixel coverage, raw raster size, and compressed `codeESC` frame
 size. Effect flags are repeatable and their order is significant.
 
+Generate the four built-in comparison pages with their exact printed headers:
+
+```powershell
+.venv\Scripts\tronic-printer.exe prepare-showcase `
+  "tests\resources\Lenna_(test_image).png" `
+  --output-dir analysis-work\image-showcase
+```
+
+Each page header contains the recipe name, dither, threshold, ordered effect
+chain, raster dimensions, and black-pixel coverage. This command has no
+transport dependency and never accesses Bluetooth.
+
 ## Example vibe recipes
 
 These are starting points rather than hardware-calibrated artistic defaults:
@@ -145,3 +157,22 @@ The resulting `prepared.raster` is passed unchanged to the existing
 `PrintRaster` CQRS command. `prepared.preview` and `prepared.summary()` are
 available to GUI and web presentation layers.
 
+## Four-page hardware showcase
+
+The HIL rig contains a separately gated scenario that prints the four labeled
+Lenna pages as individual compressed BLE jobs. The pages contain about 255 mm
+of image and header content. Four 160-dot trailing feeds add another 80 mm, for
+an expected total near 335 mm. The scenario pauses 20 seconds between jobs by
+default and checks printer status before every page.
+
+It requires all three explicit consent flags:
+
+```powershell
+.venv\Scripts\python.exe -m pytest `
+  tests\hil\test_live_ble_image_showcase.py `
+  --live --allow-printing --allow-four-image-showcase `
+  --printer-address <printer-address> -s -v
+```
+
+The pause can be increased with `--showcase-pause-seconds`. The test must be
+attended, and it has not yet been run against the printer.

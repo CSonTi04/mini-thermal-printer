@@ -13,6 +13,13 @@ from tronic_printer.preprocessing import (
     build_effect_registry,
     prepare_image,
 )
+from tronic_printer.showcase import (
+    SHOWCASE_RECIPES,
+    ImageRecipe,
+    ShowcasePage,
+    build_showcase_page,
+    build_showcase_pages,
+)
 
 __all__ = [
     "DeviceInfo",
@@ -22,12 +29,17 @@ __all__ = [
     "ImageEffect",
     "ImageEffectRegistry",
     "ImagePreparationConfig",
+    "ImageRecipe",
     "PreparedImage",
     "PrinterApplication",
     "PrinterStatus",
     "RasterImage",
+    "SHOWCASE_RECIPES",
+    "ShowcasePage",
     "build_application",
     "build_effect_registry",
+    "build_showcase_page",
+    "build_showcase_pages",
     "prepare_image",
 ]
 

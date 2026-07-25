@@ -24,7 +24,7 @@ Linux equivalent:
 
 ### Linux validation status
 
-On 2026-07-25, an editable install from `pyproject.toml`, all 90 non-HIL tests,
+On 2026-07-25, an editable install from `pyproject.toml`, all 94 non-HIL tests,
 Ruff, and the installed CLI entry point passed under Python 3.12 on Ubuntu
 24.04/WSL2. This is a Debian-family packaging and userspace compatibility test,
 not a live Linux Bluetooth test. That WSL environment exposed system D-Bus but
@@ -85,6 +85,20 @@ skipped without both consent flags:
   tests\hil\test_live_ble_preprocessed_image.py `
   --live --allow-printing --printer-address <printer-address> -v
 ```
+
+The long four-style showcase prints four independent, labeled 384×384 image
+jobs with approximately 335 mm total paper use. It adds a third consent gate
+and 20-second cooling pauses between pages:
+
+```powershell
+.venv\Scripts\python.exe -m pytest `
+  tests\hil\test_live_ble_image_showcase.py `
+  --live --allow-printing --allow-four-image-showcase `
+  --printer-address <printer-address> -s -v
+```
+
+Do not run this scenario unattended. Increase `--showcase-pause-seconds` if
+physical output or status suggests heat accumulation.
 
 The separate uncompressed probe receives successful completion but renders only
 its first expected horizontal row. It is retained as a regression probe:

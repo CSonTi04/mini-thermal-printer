@@ -87,6 +87,13 @@ Preview a styled image without accessing hardware:
   --dither floyd-steinberg --effect autocontrast:cutoff=2
 ```
 
+Build the four labeled comparison pages without accessing hardware:
+
+```powershell
+.venv\Scripts\tronic-printer.exe prepare-showcase image.jpg `
+  --output-dir analysis-work\image-showcase
+```
+
 Print a Pillow-readable image over the verified BLE path, optionally saving the
 exact one-bit preview before connecting:
 
@@ -108,10 +115,13 @@ to BlueZ and D-Bus.
 
 ## Repository policy
 
-This repository contains only original documentation and, in later phases,
-clean-room implementation code and tests. It does not contain the proprietary
-APK, decompiled sources, phone dumps, signing material, or extracted manuals.
-Those local artifacts are excluded by `.gitignore`.
+This repository contains original documentation, clean-room implementation
+code, tests, and one separately documented user-supplied Lenna test image. The
+image is not covered by any license later applied to the original project; see
+[`tests/resources/README.md`](tests/resources/README.md). The repository does
+not contain the proprietary APK, decompiled sources, phone dumps, signing
+material, or extracted manuals. Those local artifacts are excluded by
+`.gitignore`.
 
 Evidence labels used in the documentation:
 

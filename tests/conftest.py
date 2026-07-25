@@ -10,6 +10,17 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("printer hardware-in-the-loop")
     group.addoption("--live", action="store_true", help="allow access to a physical printer")
     group.addoption("--allow-printing", action="store_true", help="allow paper/head activation")
+    group.addoption(
+        "--allow-four-image-showcase",
+        action="store_true",
+        help="allow the long four-page labeled image showcase",
+    )
+    group.addoption(
+        "--showcase-pause-seconds",
+        type=float,
+        default=20.0,
+        help="cooling pause between showcase pages",
+    )
     group.addoption("--printer-port", help="Bluetooth SPP serial port, for example COM7")
     group.addoption("--printer-address", help="Bluetooth address used by the BLE HIL transport")
     group.addoption("--printer-baudrate", type=int, default=115_200)
@@ -36,6 +47,19 @@ def hil_transport(request: pytest.FixtureRequest) -> Iterator[SerialTransport]:
 def printing_allowed(request: pytest.FixtureRequest) -> None:
     if not request.config.getoption("--allow-printing"):
         pytest.skip("requires separate --allow-printing consent")
+
+
+@pytest.fixture
+def four_image_showcase_allowed(
+    request: pytest.FixtureRequest,
+    printing_allowed: None,
+) -> float:
+    if not request.config.getoption("--allow-four-image-showcase"):
+        pytest.skip("requires separate --allow-four-image-showcase consent")
+    pause = request.config.getoption("--showcase-pause-seconds")
+    if pause < 0:
+        pytest.fail("--showcase-pause-seconds cannot be negative")
+    return pause
 
 
 @pytest.fixture

@@ -188,8 +188,23 @@ Apache License 2.0 is the recommended license for the future clean-room code.
   source image was not modified or added to Git.
 - Added a deterministic low-ink preprocessing-to-BLE HIL test behind both
   consent flags. It has not been run against hardware.
-- Passed 90 non-HIL tests on Windows and WSL; all seven HIL tests skip by
+- Passed 94 non-HIL tests on Windows and WSL; all eight HIL tests skip by
   default. Ruff and Windows coverage checks passed with 89% total coverage.
+
+### Four-style labeled image showcase
+
+- Added the user-supplied 512×512 RGB Lenna PNG as a tracked test resource with
+  a pinned SHA-256 and an explicit third-party licensing notice.
+- Added reusable showcase recipes and exact one-bit labeled page generation for
+  Floyd photo, ordered newsprint, gritty noir, and outline sketch variants.
+- Added a hardware-free `prepare-showcase` command and generated all four pages
+  locally for visual inspection.
+- Added a BLE HIL scenario that prints four independent compressed jobs with
+  name/settings headers, 160-dot feeds, and configurable cooling pauses.
+- Added a dedicated `--allow-four-image-showcase` gate because the scenario is
+  approximately 335 mm long and includes two images above 50% black coverage.
+- The four-page physical scenario has not been run and still requires fresh
+  approval.
 
 ## Current checkpoint
 
