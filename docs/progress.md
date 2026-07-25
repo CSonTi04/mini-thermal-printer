@@ -16,7 +16,9 @@ The following constraints and preferences were supplied by the device owner:
 - Document and showcase progress.
 - Current priority: complete APK analysis.
 
-Apache License 2.0 is the recommended license for the future clean-room code.
+The original clean-room code and documentation are licensed under Apache
+License 2.0. The separately documented Lenna test image is excluded from that
+grant because no license information accompanied it.
 
 ## Completed
 
