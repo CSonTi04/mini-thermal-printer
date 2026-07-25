@@ -88,19 +88,34 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Enforced `--live` for physical access and `--allow-printing` in addition for
   print-head or paper-moving tests.
 - Created the approved local `.venv` and installed the project dependencies.
-- Verified 44 non-HIL tests with 88% aggregate package coverage and clean Ruff
-  checks. Verified that both HIL tests skip without consent flags.
+- Verified 51 non-HIL tests with 88% aggregate package coverage and clean Ruff
+  checks. Verified that all four HIL tests skip without consent flags.
+
+### PC BLE discovery and read-only HIL
+
+- Paired the printer's BLE identity with Windows; the idle Settings label `Not
+  connected` was confirmed to be normal rather than a pairing failure.
+- Enumerated the live GATT database and verified FF01 notify, FF02 write without
+  response, and FF03 credit/packet-size notify roles under service FF00.
+- Implemented a credit-aware BLE transport with a private asyncio loop behind
+  the same synchronous transport port used by the CQRS application.
+- Observed the printer request a 100-byte packet payload, capped it to Windows'
+  20-byte write-without-response limit, and completed model, firmware, battery,
+  density, and status queries over BLE.
+- Verified `A2Y`, `V1.06LY`, 86% battery, density 1, and clean status `00`.
+- Passed the dedicated read-only BLE HIL test. No print, feed, or setting change
+  was transmitted.
 
 ## Current checkpoint
 
-The official app's transport and normal print sequence are verified, and the
-mock-backed Python implementation is ready for PC-side discovery. Serial-port
-enumeration currently returns no ports, so Windows pairing is the next live
-checkpoint. No PC command has yet been sent to the physical printer.
+The official app's classic SPP print sequence and the Python driver's PC BLE
+read-only path are both verified. Windows has not created a classic SPP COM
+port, but BLE provides a working PC transport. The next live checkpoint is a
+separately approved, minimal uncompressed test pattern over BLE. No PC print or
+paper-feed command has yet been sent.
 
 Remaining unknowns:
 
-- the live FF00 BLE characteristic layout and negotiated MTU/credits;
 - the proprietary `codeESC` compressed-raster algorithm;
 - whether this firmware also accepts the uncompressed `GS v 0` envelope;
 - exact physical margins and maximum reliable printable width; and

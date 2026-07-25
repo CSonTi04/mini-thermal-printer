@@ -10,7 +10,7 @@ from typing import NoReturn
 
 from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
-from tronic_printer.infrastructure.ble import discover, inspect_gatt
+from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
 from tronic_printer.messages import GetDeviceInfo, PrintRaster
 
@@ -45,6 +45,20 @@ def build_parser() -> argparse.ArgumentParser:
     gatt.add_argument("address")
     gatt.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
 
+    ble_info = subparsers.add_parser("ble-info", help="query identity and telemetry over BLE")
+    ble_info.add_argument("address")
+    ble_info.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+
+    ble_print = subparsers.add_parser("ble-print-test", help="print a test pattern over BLE")
+    ble_print.add_argument("address")
+    ble_print.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_print.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
+    )
+    ble_print.add_argument("--height", type=int, default=32)
+
     for name in ("info", "print-test"):
         command = subparsers.add_parser(name)
         command.add_argument("--port", required=True)
@@ -66,11 +80,42 @@ def main(argv: list[str] | None = None) -> int:
         _print_json(available_ports())
         return 0
     if args.action == "ble-scan":
-        _print_json([asdict(item) for item in asyncio.run(discover(args.timeout))])
+        try:
+            devices = asyncio.run(discover(args.timeout))
+        except OSError as error:
+            raise SystemExit(f"BLE scan failed: {error}") from error
+        _print_json([asdict(item) for item in devices])
         return 0
     if args.action == "ble-gatt":
         _require(args.live, "refusing Bluetooth connection without --live")
-        _print_json(asyncio.run(inspect_gatt(args.address)))
+        try:
+            metadata = asyncio.run(inspect_gatt(args.address))
+        except OSError as error:
+            raise SystemExit(f"BLE GATT inspection failed: {error}") from error
+        _print_json(metadata)
+        return 0
+    if args.action == "ble-info":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        try:
+            with BleTransport(args.address) as transport:
+                info = build_application(transport).queries.ask(GetDeviceInfo())
+                result = asdict(info)
+                result["status"] = asdict(info.status)
+                result["ble"] = transport.connection_info
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE query failed: {error}") from error
+        _print_json(result)
+        return 0
+    if args.action == "ble-print-test":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        try:
+            with BleTransport(args.address) as transport:
+                pattern = RasterImage.test_pattern(height=args.height)
+                result = build_application(transport).commands.execute(PrintRaster(pattern))
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE print failed: {error}") from error
+        _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
         return 0
 
     with _serial_transport(args) as transport:

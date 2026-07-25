@@ -17,6 +17,7 @@ SDK commands not seen in that capture remain unverified.
 | Transport enum | `BLE_DUAL` | Recovered |
 | SDK per-device BLE gate | `false` | Recovered |
 | Official-app transport | Classic RFCOMM/SPP | Verified |
+| PC BLE transport | FF00 GATT service | Verified |
 | Live model response | `A2Y` | Verified |
 | Live firmware response | `V1.06LY` | Verified |
 | Print width | 384 dots | Verified |
@@ -55,6 +56,12 @@ not include that octet when reproducing commands through an OS serial port.
 
 ## BLE GATT transport
 
+A Windows live session on 2026-07-25 verified this service layout and used it
+successfully for model, firmware, battery, density, and status queries. The
+printer requested a 100-byte packet payload through FF03, but Windows exposed
+a 20-byte write-without-response maximum, so the driver safely uses 20-byte
+packets. Printing over BLE has not yet been attempted.
+
 The bundled SDK also implements the following BLE transport:
 
 | Role | Selection rule |
@@ -65,8 +72,8 @@ The bundled SDK also implements the following BLE transport:
 | Flow-control notify | notify characteristic whose UUID starts with `0000ff03` |
 
 The write characteristic UUID is selected by properties, not by a hard-coded
-UUID. A common FF02 layout is plausible but remains **unknown** until live GATT
-enumeration.
+UUID. Live enumeration verified that this printer uses `FF02`, with both
+`write` and `write without response` properties.
 
 FastBle is initialized with a 20-byte split-write size, a 10-second connection
 timeout, and a 5-second operation timeout. The printer transport layers its own

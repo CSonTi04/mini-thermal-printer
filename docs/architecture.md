@@ -18,6 +18,7 @@ flowchart LR
     QH --> PORT["PrinterTransport port"]
     CH --> PORT
     PORT --> SPP["Serial / classic SPP adapter"]
+    PORT --> BLE["Credit-aware BLE adapter"]
     PORT --> MOCK["Emulated printer"]
 ```
 
@@ -33,8 +34,10 @@ flowchart LR
   I/O.
 - `infrastructure/serial.py` implements classic RFCOMM/SPP through a Windows or
   Linux serial device. Writes follow the official app's 16,384-byte limit.
-- `infrastructure/ble.py` currently provides only passive discovery and
-  metadata-only GATT enumeration.
+- `infrastructure/ble.py` provides passive discovery, metadata-only GATT
+  enumeration, and a synchronous CQRS adapter backed by an asyncio event-loop
+  thread. It implements the verified FF01/FF02/FF03 response, write, credit,
+  and packet-size behavior.
 - `testing.py` provides scripted and stateful in-memory transports.
 - `cli.py` is a thin presentation adapter. It owns consent flags but no printer
   protocol logic.

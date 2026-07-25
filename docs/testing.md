@@ -38,12 +38,26 @@ Read-only identity and telemetry tests require both a port and `--live`:
   --live --printer-port COM7 -v
 ```
 
+The verified BLE equivalent takes the printer address instead of a COM port:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_queries.py `
+  --live --printer-address <printer-address> -v
+```
+
 The print test is more strongly gated because it activates the print head and
 moves paper. It will skip unless both consent flags are present:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests\hil\test_live_print.py `
   --live --allow-printing --printer-port COM7 -v
+```
+
+BLE printing has the same separate consent requirement:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_print.py `
+  --live --allow-printing --printer-address <printer-address> -v
 ```
 
 The live print currently probes the unverified uncompressed `GS v 0` path. It
@@ -57,6 +71,8 @@ The CLI mirrors the test safety model:
 ```text
 tronic-printer info --port COM7 --live
 tronic-printer print-test --port COM7 --live --allow-printing
+tronic-printer ble-info <printer-address> --live
+tronic-printer ble-print-test <printer-address> --live --allow-printing
 ```
 
 Omitting either required flag stops before the corresponding hardware action.

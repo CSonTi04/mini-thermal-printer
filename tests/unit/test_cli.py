@@ -89,6 +89,16 @@ def test_ble_scan_formats_discovered_devices(
     assert json.loads(capsys.readouterr().out)[0]["rssi"] == -42
 
 
+def test_ble_scan_reports_unavailable_radio(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def failed_discover(_timeout: float) -> list[object]:
+        raise OSError("radio unavailable")
+
+    monkeypatch.setattr(cli, "discover", failed_discover)
+
+    with pytest.raises(SystemExit, match="BLE scan failed: radio unavailable"):
+        cli.main(["ble-scan"])
+
+
 def test_gatt_requires_live(monkeypatch: pytest.MonkeyPatch) -> None:
     called = False
 
@@ -114,3 +124,72 @@ def test_gatt_live_formats_metadata(
 
     assert cli.main(["ble-gatt", "mock", "--live"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["service"] == "ff00"
+
+
+def test_gatt_reports_connection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def failed_gatt(_address: str) -> list[dict[str, object]]:
+        raise OSError("connection unavailable")
+
+    monkeypatch.setattr(cli, "inspect_gatt", failed_gatt)
+
+    with pytest.raises(SystemExit, match="GATT inspection failed: connection unavailable"):
+        cli.main(["ble-gatt", "mock", "--live"])
+
+
+def test_ble_info_requires_live() -> None:
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-info", "mock"])
+
+
+def test_ble_info_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    printer.connection_info = {  # type: ignore[attr-defined]
+        "packet_size": 20,
+        "host_write_limit": 100,
+        "credits": 5,
+    }
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    assert cli.main(["ble-info", "mock", "--live"]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["model"] == "A2Y"
+    assert output["ble"]["packet_size"] == 20
+
+
+def test_ble_print_requires_both_consent_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-print-test", "mock"])
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main(["ble-print-test", "mock", "--live"])
+
+    assert printer.writes == []
+
+
+def test_ble_print_with_both_flags_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    result = cli.main(
+        [
+            "ble-print-test",
+            "mock",
+            "--live",
+            "--allow-printing",
+            "--height",
+            "16",
+        ]
+    )
+
+    assert result == 0
+    assert json.loads(capsys.readouterr().out)["completion"] == "aa 0d 0a"
+    assert len(printer.completed_jobs) == 1
