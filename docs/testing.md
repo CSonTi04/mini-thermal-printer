@@ -33,7 +33,8 @@ had no `bluetoothctl` command and no controller in `/sys/class/bluetooth`.
 Live Debian BLE HIL requires a physical or virtualized Debian host whose
 Bluetooth adapter is visible to BlueZ. Use the same `--live` and
 `--allow-printing` gates shown below; do not infer live BLE support from the WSL
-result alone.
+result alone. The planned native target and staged procedure are documented in
+[Raspberry Pi native Linux HIL stage](rpi-hil.md).
 
 ## Hardware-in-the-loop rig
 

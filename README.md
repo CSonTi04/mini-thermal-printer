@@ -42,6 +42,7 @@ The findings are documented in:
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)
+- [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
 
 Remaining generic SDK behavior is not presented as live hardware validation.
