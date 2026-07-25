@@ -24,7 +24,7 @@ Linux equivalent:
 
 ### Linux validation status
 
-On 2026-07-25, an editable install from `pyproject.toml`, all 65 non-HIL tests,
+On 2026-07-25, an editable install from `pyproject.toml`, all 90 non-HIL tests,
 Ruff, and the installed CLI entry point passed under Python 3.12 on Ubuntu
 24.04/WSL2. This is a Debian-family packaging and userspace compatibility test,
 not a live Linux Bluetooth test. That WSL environment exposed system D-Bus but
@@ -73,6 +73,16 @@ consent:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_compressed_print.py `
+  --live --allow-printing --printer-address <printer-address> -v
+```
+
+A separate low-ink image-pipeline HIL test exercises normalization, two ordered
+effects, ordered 4×4 dithering, compression, and BLE transport. It remains
+skipped without both consent flags:
+
+```powershell
+.venv\Scripts\python.exe -m pytest `
+  tests\hil\test_live_ble_preprocessed_image.py `
   --live --allow-printing --printer-address <printer-address> -v
 ```
 

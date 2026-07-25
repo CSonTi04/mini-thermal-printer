@@ -6,11 +6,12 @@ import argparse
 import asyncio
 import json
 from dataclasses import asdict
+from pathlib import Path
 from typing import NoReturn
 
+from tronic_printer import protocol
 from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
-from tronic_printer.image import load_raster
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
 from tronic_printer.messages import (
@@ -19,6 +20,14 @@ from tronic_printer.messages import (
     PrintRaster,
     PrintResult,
     RasterEncoding,
+)
+from tronic_printer.preprocessing import (
+    DitherMode,
+    EffectSpec,
+    ImagePreparationConfig,
+    PreparedImage,
+    build_effect_registry,
+    load_prepared_image,
 )
 
 
@@ -45,17 +54,47 @@ def _add_print_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_image_options(parser: argparse.ArgumentParser) -> None:
+def _add_preparation_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("image", help="PNG, JPEG, BMP, or another Pillow-readable image")
     parser.add_argument("--width", type=int, default=384, help="output width in dots")
     parser.add_argument("--threshold", type=int, default=128, help="black threshold from 0 to 255")
+    parser.add_argument(
+        "--dither",
+        choices=[mode.value for mode in DitherMode],
+        default=DitherMode.THRESHOLD.value,
+    )
+    parser.add_argument(
+        "--effect",
+        action="append",
+        default=[],
+        metavar="NAME[:KEY=VALUE,...]",
+        help="apply a registered effect; repeat to build an ordered chain",
+    )
+
+
+def _add_image_print_options(parser: argparse.ArgumentParser) -> None:
+    _add_preparation_options(parser)
+    parser.add_argument("--preview", help="save the exact one-bit raster PNG before connecting")
     _add_print_options(parser)
 
 
-def _load_image_or_exit(path: str, *, width: int, threshold: int) -> RasterImage:
+def _prepare_image_or_exit(args: argparse.Namespace) -> PreparedImage:
     try:
-        return load_raster(path, width=width, threshold=threshold)
-    except (OSError, ValueError) as error:
+        config = ImagePreparationConfig(
+            width=args.width,
+            threshold=args.threshold,
+            dither=DitherMode(args.dither),
+            effects=tuple(EffectSpec.parse(value) for value in args.effect),
+        )
+        prepared = load_prepared_image(
+            args.image,
+            config,
+            registry=build_effect_registry(),
+        )
+        if getattr(args, "preview", None):
+            prepared.save_preview(args.preview)
+        return prepared
+    except (ImportError, OSError, TypeError, ValueError) as error:
         raise SystemExit(f"cannot prepare image: {error}") from error
 
 
@@ -67,11 +106,32 @@ def _print_result(result: PrintResult, raster: RasterImage) -> None:
     _print_json(values)
 
 
+def _prepared_summary(prepared: PreparedImage) -> dict[str, object]:
+    return prepared.summary() | {
+        "code_esc_frame_bytes": len(protocol.encode_compressed_raster(prepared.raster))
+    }
+
+
+def _prepared_print_result(result: PrintResult, prepared: PreparedImage) -> None:
+    values = asdict(result)
+    values["completion"] = result.completion.hex(" ")
+    values["image"] = _prepared_summary(prepared)
+    _print_json(values)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tronic-printer")
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     subparsers.add_parser("ports", help="list operating-system serial ports")
+    subparsers.add_parser("image-effects", help="list built-in and installed image effects")
+
+    prepare = subparsers.add_parser(
+        "prepare-image",
+        help="prepare and preview the exact raster without hardware access",
+    )
+    _add_preparation_options(prepare)
+    prepare.add_argument("--output", "-o", required=True, help="destination PNG preview")
 
     scan = subparsers.add_parser("ble-scan", help="scan for matching BLE advertisements")
     scan.add_argument("--timeout", type=float, default=5.0)
@@ -107,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="confirm that activating the head and moving paper is allowed",
     )
-    _add_image_options(ble_image)
+    _add_image_print_options(ble_image)
 
     ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
     ble_feed.add_argument("address")
@@ -135,7 +195,7 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--line-width", type=int, default=1)
             _add_print_options(command)
         elif name == "print-image":
-            _add_image_options(command)
+            _add_image_print_options(command)
     return parser
 
 
@@ -143,6 +203,20 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.action == "ports":
         _print_json(available_ports())
+        return 0
+    if args.action == "image-effects":
+        try:
+            _print_json(build_effect_registry().describe())
+        except (ImportError, TypeError, ValueError) as error:
+            raise SystemExit(f"cannot load image effects: {error}") from error
+        return 0
+    if args.action == "prepare-image":
+        prepared = _prepare_image_or_exit(args)
+        try:
+            prepared.save_preview(Path(args.output))
+        except OSError as error:
+            raise SystemExit(f"cannot save preview: {error}") from error
+        _print_json(_prepared_summary(prepared) | {"preview": str(Path(args.output))})
         return 0
     if args.action == "ble-scan":
         try:
@@ -194,19 +268,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.action == "ble-print-image":
         _require(args.live, "refusing Bluetooth connection without --live")
         _require(args.allow_printing, "refusing to print without --allow-printing")
-        raster = _load_image_or_exit(args.image, width=args.width, threshold=args.threshold)
+        prepared = _prepare_image_or_exit(args)
         try:
             with BleTransport(args.address) as transport:
                 result = build_application(transport).commands.execute(
                     PrintRaster(
-                        raster,
+                        prepared.raster,
                         feed_dots=args.feed_dots,
                         encoding=RasterEncoding(args.encoding),
                     )
                 )
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE print failed: {error}") from error
-        _print_result(result, raster)
+        _prepared_print_result(result, prepared)
         return 0
     if args.action == "ble-feed":
         _require(args.live, "refusing Bluetooth connection without --live")
@@ -217,6 +291,21 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE feed failed: {error}") from error
         _print_json({"fed_dots": args.dots, "fed_mm": args.dots / 8})
+        return 0
+
+    if args.action == "print-image":
+        _require(args.live, "refusing hardware access without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        prepared = _prepare_image_or_exit(args)
+        with SerialTransport(args.port, baudrate=args.baudrate) as transport:
+            result = build_application(transport).commands.execute(
+                PrintRaster(
+                    prepared.raster,
+                    feed_dots=args.feed_dots,
+                    encoding=RasterEncoding(args.encoding),
+                )
+            )
+        _prepared_print_result(result, prepared)
         return 0
 
     with _serial_transport(args) as transport:
@@ -241,18 +330,6 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             _print_result(result, pattern)
-            return 0
-        if args.action == "print-image":
-            _require(args.allow_printing, "refusing to print without --allow-printing")
-            raster = _load_image_or_exit(args.image, width=args.width, threshold=args.threshold)
-            result = app.commands.execute(
-                PrintRaster(
-                    raster,
-                    feed_dots=args.feed_dots,
-                    encoding=RasterEncoding(args.encoding),
-                )
-            )
-            _print_result(result, raster)
             return 0
     return _unreachable(args.action)
 

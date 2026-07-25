@@ -1,10 +1,11 @@
-"""Pillow adapter for converting ordinary images into domain rasters."""
+"""Compatibility helpers over the extensible image-preparation pipeline."""
 
 from __future__ import annotations
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 from tronic_printer.domain import RasterImage
+from tronic_printer.preprocessing import ImagePreparationConfig, load_prepared_image, prepare_image
 
 
 def image_to_raster(
@@ -14,26 +15,14 @@ def image_to_raster(
     threshold: int = 128,
     preserve_aspect_ratio: bool = True,
 ) -> RasterImage:
-    if width <= 0:
-        raise ValueError("width must be positive")
-    if threshold not in range(256):
-        raise ValueError("threshold must be between 0 and 255")
-
-    grayscale = ImageOps.grayscale(image)
-    if preserve_aspect_ratio:
-        height = max(1, round(grayscale.height * width / grayscale.width))
-        grayscale = grayscale.resize((width, height), Image.Resampling.BILINEAR)
-    elif grayscale.width != width:
-        grayscale = grayscale.resize((width, grayscale.height), Image.Resampling.BILINEAR)
-
-    pixels = grayscale.tobytes()
-    rows = [
-        [pixels[y * width + x] < threshold for x in range(width)]
-        for y in range(grayscale.height)
-    ]
-    return RasterImage.from_rows(rows)
+    config = ImagePreparationConfig(
+        width=width,
+        threshold=threshold,
+        preserve_aspect_ratio=preserve_aspect_ratio,
+    )
+    return prepare_image(image, config, registry=None).raster
 
 
 def load_raster(path: str, **kwargs: object) -> RasterImage:
-    with Image.open(path) as image:
-        return image_to_raster(image, **kwargs)
+    config = ImagePreparationConfig(**kwargs)
+    return load_prepared_image(path, config).raster

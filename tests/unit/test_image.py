@@ -25,6 +25,15 @@ def test_image_adapter_validates_inputs() -> None:
         image_to_raster(image, threshold=256)
 
 
+def test_image_adapter_preserves_non_proportional_compatibility() -> None:
+    image = Image.new("L", (2, 3), color=0)
+
+    raster = image_to_raster(image, width=4, preserve_aspect_ratio=False)
+
+    assert raster.width == 4
+    assert raster.height == 3
+
+
 def test_load_raster_closes_source_file(tmp_path: Path) -> None:
     path = tmp_path / "sample.png"
     Image.new("L", (2, 1), color=0).save(path)

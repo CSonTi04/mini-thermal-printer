@@ -169,6 +169,28 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Added a staged Raspberry Pi checklist that preserves separate discovery,
   query, calibration-print, and image-print approval gates.
 
+### Extensible image preprocessing
+
+- Added image-effect plugin API version 1 with programmatic registration and
+  automatic discovery through `tronic_printer.image_effects` package entry
+  points.
+- Added eight composable built-in effects: autocontrast, brightness, contrast,
+  edge, gamma, invert, blur, and sharpen.
+- Added threshold, Floyd–Steinberg, and ordered 4×4 rasterization modes.
+- Added EXIF orientation, transparent-to-white compositing, high-quality
+  proportional resizing, exact one-bit PNG previews, and print-size/ink/frame
+  metrics.
+- Added `image-effects` and hardware-free `prepare-image` commands. Both serial
+  and BLE image commands accept the identical ordered effect pipeline and can
+  save the final preview before opening their transport.
+- Generated four ignored real-image previews through the production CLI to
+  compare diffusion, newsprint, noir, and outline treatments. The untracked
+  source image was not modified or added to Git.
+- Added a deterministic low-ink preprocessing-to-BLE HIL test behind both
+  consent flags. It has not been run against hardware.
+- Passed 90 non-HIL tests on Windows and WSL; all seven HIL tests skip by
+  default. Ruff and Windows coverage checks passed with 89% total coverage.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
@@ -177,11 +199,16 @@ SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered,
 reproduced byte-for-byte, and verified through a complete physical multi-row
 print. The Windows BLE driver path and practical image-printing CLI are now
 functional. Debian-family packaging and mocked behavior are validated in WSL;
-live BLE is intentionally deferred to the Raspberry Pi stage.
+the image pipeline is ready for preview experimentation, and live Linux BLE is
+intentionally deferred to the Raspberry Pi stage.
 
 Remaining unknowns:
 
 - live BLE behavior on a native Debian/BlueZ host;
+- maximum reliable compressed image height and the need for long-image
+  segmentation;
+- preferred physically calibrated preprocessing defaults for different media
+  and artistic styles;
 - exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 

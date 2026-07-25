@@ -24,6 +24,54 @@ def test_ports_is_read_only_and_json_formatted(
     assert json.loads(capsys.readouterr().out)[0]["device"] == "COM7"
 
 
+def test_image_effects_lists_builtin_plugins(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["image-effects"]) == 0
+
+    names = {item["name"] for item in json.loads(capsys.readouterr().out)}
+    assert {"autocontrast", "contrast", "edge", "gamma", "invert"} <= names
+
+
+def test_prepare_image_writes_exact_preview_without_hardware(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.png"
+    preview = tmp_path / "preview.png"
+    pixels = Image.new("L", (2, 1))
+    pixels.putdata([0, 255])
+    pixels.save(source)
+    monkeypatch.setattr(
+        cli,
+        "BleTransport",
+        lambda *_args, **_kwargs: pytest.fail("prepare-image opened Bluetooth"),
+    )
+
+    result = cli.main(
+        [
+            "prepare-image",
+            str(source),
+            "--output",
+            str(preview),
+            "--width",
+            "2",
+            "--effect",
+            "invert",
+            "--dither",
+            "ordered-4x4",
+        ]
+    )
+
+    assert result == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["preview"] == str(preview)
+    assert output["effects"] == ["invert"]
+    assert output["code_esc_frame_bytes"] > 10
+    with Image.open(preview) as rendered:
+        assert rendered.size == (2, 1)
+        assert set(rendered.tobytes()) <= {0, 255}
+
+
 def test_info_refuses_hardware_without_live() -> None:
     with pytest.raises(SystemExit, match="--live"):
         cli.main(["info", "--port", "COM7"])
@@ -262,8 +310,8 @@ def test_ble_print_image_uses_shared_application(
     assert result == 0
     output = json.loads(capsys.readouterr().out)
     assert output["completion"] == "aa 0d 0a"
-    assert output["width"] == 2
-    assert output["height"] == 1
+    assert output["image"]["width"] == 2
+    assert output["image"]["height"] == 1
     assert len(printer.completed_jobs) == 1
     assert printer.completed_jobs[0][2].startswith(bytes.fromhex("1F 10"))
 

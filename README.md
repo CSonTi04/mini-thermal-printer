@@ -42,6 +42,7 @@ The findings are documented in:
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)
+- [Image preprocessing and effect plugins](docs/image-preprocessing.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
 
@@ -79,16 +80,26 @@ Compressed `codeESC` output is the default because the live uncompressed probe
 rendered only its first expected row. The encoding remains explicitly
 selectable for regression work.
 
-Print a Pillow-readable image over the verified BLE path:
+Preview a styled image without accessing hardware:
+
+```powershell
+.venv\Scripts\tronic-printer.exe prepare-image image.jpg -o preview.png `
+  --dither floyd-steinberg --effect autocontrast:cutoff=2
+```
+
+Print a Pillow-readable image over the verified BLE path, optionally saving the
+exact one-bit preview before connecting:
 
 ```powershell
 .venv\Scripts\tronic-printer.exe ble-print-image <printer-address> image.png `
-  --width 384 --threshold 128 --feed-dots 160 --live --allow-printing
+  --preview preview.png --width 384 --dither floyd-steinberg `
+  --effect contrast:factor=1.4 --feed-dots 160 --live --allow-printing
 ```
 
-The image is converted before Bluetooth is opened, resized proportionally to
-the requested dot width, converted to one-bit raster data, and sent through the
-same `PrintRaster` CQRS command available to future GUI and web adapters.
+The extensible pipeline applies ordered, repeatable effects and converts the
+image before Bluetooth is opened. Built-in effects and separately installed
+entry-point plugins feed the same `RasterImage` and `PrintRaster` CQRS command
+available to future GUI and web adapters.
 
 The package, CLI, linter, and complete mocked test rig also pass under Python
 3.12 on Ubuntu 24.04/WSL2. This validates Debian-family userspace portability;
