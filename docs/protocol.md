@@ -286,6 +286,13 @@ Recompressing those bytes with the parameters above reproduces all 217 captured
 bytes and the existing compressed-payload hash. The clean-room Python driver
 uses this encoding by default.
 
+A subsequent live BLE calibration used a 384×96 raster with three-dot lines.
+Its 4,608 raw bytes compressed to 65 bytes in a 75-byte frame with SHA-256
+`61406202BF27FA23264A61738E1D6DB7B217FC87656BC7F9E913F6AD934EAE4E`.
+The printer returned `AA 0D 0A`, and physical inspection confirmed the complete
+border, crosshair, and all 2 mm ruler ticks. Multi-row `codeESC` output is
+therefore verified end to end.
+
 ## Grayscale extension
 
 The SDK contains a grayscale raster extension:

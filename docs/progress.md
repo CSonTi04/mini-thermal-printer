@@ -136,13 +136,25 @@ Apache License 2.0 is the recommended license for the future clean-room code.
   diagnostics.
 - Verified 59 non-HIL tests and six HIL tests that skip without consent flags.
 
+### Compressed print HIL
+
+- Received separate approval for one deterministic compressed calibration job.
+- Sent a 384×96 raster with three-dot border/crosshair lines, 2 mm ruler ticks,
+  and a 160-dot trailing feed.
+- Compressed 4,608 raster bytes to a 65-byte `codeESC` payload in a 75-byte
+  frame.
+- Received `AA 0D 0A`; the compressed BLE HIL test passed.
+- Visually confirmed the complete pattern, consistent line weight, side
+  margins, and useful blank tear margin from the user's photograph.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
 query path and feed workaround are verified. Windows has not created a classic
-SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered
-and reproduced byte-for-byte; the next checkpoint is one separately approved
-compressed calibration print.
+SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered,
+reproduced byte-for-byte, and verified through a complete physical multi-row
+print. The Windows BLE driver path is now functional; Debian validation is the
+next host milestone.
 
 Remaining unknowns:
 
