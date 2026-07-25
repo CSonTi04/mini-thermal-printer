@@ -157,6 +157,14 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Verified that missing or invalid images fail before a BLE connection opens.
 - Passed 65 non-HIL tests with all six hardware tests excluded.
 
+### Debian-family userspace validation
+
+- Installed the project from `pyproject.toml` into an isolated Python 3.12
+  environment on Ubuntu 24.04/WSL2.
+- Passed the same 65 non-HIL tests, Ruff checks, and installed CLI smoke test.
+- Confirmed that this WSL environment has system D-Bus but no exposed Bluetooth
+  controller or `bluetoothctl`; no Linux BLE hardware claim is made from it.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
@@ -164,10 +172,12 @@ query path and feed workaround are verified. Windows has not created a classic
 SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered,
 reproduced byte-for-byte, and verified through a complete physical multi-row
 print. The Windows BLE driver path and practical image-printing CLI are now
-functional; Debian validation is the next host milestone.
+functional. Debian-family packaging and mocked behavior are validated; live
+BLE on a native Debian host is the remaining host milestone.
 
 Remaining unknowns:
 
+- live BLE behavior on a native Debian/BlueZ host;
 - exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 

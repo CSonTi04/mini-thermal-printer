@@ -89,6 +89,11 @@ The image is converted before Bluetooth is opened, resized proportionally to
 the requested dot width, converted to one-bit raster data, and sent through the
 same `PrintRaster` CQRS command available to future GUI and web adapters.
 
+The package, CLI, linter, and complete mocked test rig also pass under Python
+3.12 on Ubuntu 24.04/WSL2. This validates Debian-family userspace portability;
+live Linux BLE still requires a host where the Bluetooth controller is exposed
+to BlueZ and D-Bus.
+
 ## Repository policy
 
 This repository contains only original documentation and, in later phases,

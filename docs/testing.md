@@ -22,6 +22,19 @@ Linux equivalent:
 .venv/bin/python -m pytest -m "not hil"
 ```
 
+### Linux validation status
+
+On 2026-07-25, an editable install from `pyproject.toml`, all 65 non-HIL tests,
+Ruff, and the installed CLI entry point passed under Python 3.12 on Ubuntu
+24.04/WSL2. This is a Debian-family packaging and userspace compatibility test,
+not a live Linux Bluetooth test. That WSL environment exposed system D-Bus but
+had no `bluetoothctl` command and no controller in `/sys/class/bluetooth`.
+
+Live Debian BLE HIL requires a physical or virtualized Debian host whose
+Bluetooth adapter is visible to BlueZ. Use the same `--live` and
+`--allow-printing` gates shown below; do not infer live BLE support from the WSL
+result alone.
+
 ## Hardware-in-the-loop rig
 
 Prerequisites:
