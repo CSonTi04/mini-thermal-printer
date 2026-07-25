@@ -203,8 +203,12 @@ Apache License 2.0 is the recommended license for the future clean-room code.
   name/settings headers, 160-dot feeds, and configurable cooling pauses.
 - Added a dedicated `--allow-four-image-showcase` gate because the scenario is
   approximately 335 mm long and includes two images above 50% black coverage.
-- The four-page physical scenario has not been run and still requires fresh
-  approval.
+- Ran the separately approved four-page scenario. The first attempt stopped
+  before connecting while the printer was off; the retry passed in 90.74
+  seconds after passive discovery confirmed advertising.
+- Four user photographs confirmed complete readable headers, complete images,
+  stable alignment, distinct style output, and no visible heat dropout.
+- Raised the verified compressed page-height lower bound from 96 to 538 rows.
 
 ## Current checkpoint
 
@@ -220,8 +224,8 @@ intentionally deferred to the Raspberry Pi stage.
 Remaining unknowns:
 
 - live BLE behavior on a native Debian/BlueZ host;
-- maximum reliable compressed image height and the need for long-image
-  segmentation;
+- maximum reliable compressed image height beyond the verified 538-row lower
+  bound and the need for long-image segmentation;
 - preferred physically calibrated preprocessing defaults for different media
   and artistic styles;
 - exact physical margins and maximum reliable printable width; and

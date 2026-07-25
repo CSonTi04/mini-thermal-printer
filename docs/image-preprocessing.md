@@ -175,4 +175,6 @@ It requires all three explicit consent flags:
 ```
 
 The pause can be increased with `--showcase-pause-seconds`. The test must be
-attended, and it has not yet been run against the printer.
+attended. The first physical run passed in 90.74 seconds and photographs
+confirmed all four complete pages without visible heat dropout; see
+[the hardware capture note](captures/pc-ble-image-showcase-2026-07-25.md).

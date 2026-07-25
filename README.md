@@ -39,6 +39,7 @@ The findings are documented in:
 - [PC BLE discovery and read-only queries](docs/captures/pc-ble-2026-07-25.md)
 - [PC BLE uncompressed print](docs/captures/pc-ble-print-2026-07-25.md)
 - [PC BLE compressed print](docs/captures/pc-ble-compressed-print-2026-07-25.md)
+- [PC BLE four-style image showcase](docs/captures/pc-ble-image-showcase-2026-07-25.md)
 - [Protocol reference](docs/protocol.md)
 - [Progress and approval log](docs/progress.md)
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)
@@ -107,6 +108,10 @@ The extensible pipeline applies ordered, repeatable effects and converts the
 image before Bluetooth is opened. Built-in effects and separately installed
 entry-point plugins feed the same `RasterImage` and `PrintRaster` CQRS command
 available to future GUI and web adapters.
+
+All four built-in showcase recipes have been physically verified on the target
+printer as complete labeled 384×384 images. The longest successful composed
+page was 538 raster rows.
 
 The package, CLI, linter, and complete mocked test rig also pass under Python
 3.12 on Ubuntu 24.04/WSL2. This validates Debian-family userspace portability;

@@ -293,6 +293,12 @@ The printer returned `AA 0D 0A`, and physical inspection confirmed the complete
 border, crosshair, and all 2 mm ruler ticks. Multi-row `codeESC` output is
 therefore verified end to end.
 
+The later four-style image showcase verified realistic high-entropy compressed
+pages at heights of 494, 516, and 538 rows. All four jobs completed on one BLE
+connection, and photographs showed complete rasters without missing horizontal
+bands. The verified reliable-height lower bound is therefore 538 rows; this is
+not evidence that 538 is the protocol or firmware maximum.
+
 ## Grayscale extension
 
 The SDK contains a grayscale raster extension:

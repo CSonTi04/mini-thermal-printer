@@ -100,6 +100,11 @@ and 20-second cooling pauses between pages:
 Do not run this scenario unattended. Increase `--showcase-pause-seconds` if
 physical output or status suggests heat accumulation.
 
+The first approved run completed all four jobs in 90.74 seconds. Photographs
+confirmed complete headers and images, including the 538-row noir page and its
+large solid-black regions. The scenario is therefore hardware-verified on the
+Windows BLE path; its explicit gates remain mandatory for future runs.
+
 The separate uncompressed probe receives successful completion but renders only
 its first expected horizontal row. It is retained as a regression probe:
 
