@@ -10,9 +10,16 @@ from typing import NoReturn
 
 from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
+from tronic_printer.image import load_raster
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
-from tronic_printer.messages import FeedPaper, GetDeviceInfo, PrintRaster, RasterEncoding
+from tronic_printer.messages import (
+    FeedPaper,
+    GetDeviceInfo,
+    PrintRaster,
+    PrintResult,
+    RasterEncoding,
+)
 
 
 def _require(flag: bool, message: str) -> None:
@@ -27,6 +34,37 @@ def _serial_transport(args: argparse.Namespace) -> SerialTransport:
 
 def _print_json(value: object) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def _add_print_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--feed-dots", type=int, default=80)
+    parser.add_argument(
+        "--encoding",
+        choices=[encoding.value for encoding in RasterEncoding],
+        default=RasterEncoding.CODE_ESC.value,
+    )
+
+
+def _add_image_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("image", help="PNG, JPEG, BMP, or another Pillow-readable image")
+    parser.add_argument("--width", type=int, default=384, help="output width in dots")
+    parser.add_argument("--threshold", type=int, default=128, help="black threshold from 0 to 255")
+    _add_print_options(parser)
+
+
+def _load_image_or_exit(path: str, *, width: int, threshold: int) -> RasterImage:
+    try:
+        return load_raster(path, width=width, threshold=threshold)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"cannot prepare image: {error}") from error
+
+
+def _print_result(result: PrintResult, raster: RasterImage) -> None:
+    values = asdict(result)
+    values["completion"] = result.completion.hex(" ")
+    values["width"] = raster.width
+    values["height"] = raster.height
+    _print_json(values)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,12 +97,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ble_print.add_argument("--height", type=int, default=32)
     ble_print.add_argument("--line-width", type=int, default=1)
-    ble_print.add_argument("--feed-dots", type=int, default=80)
-    ble_print.add_argument(
-        "--encoding",
-        choices=[encoding.value for encoding in RasterEncoding],
-        default=RasterEncoding.CODE_ESC.value,
+    _add_print_options(ble_print)
+
+    ble_image = subparsers.add_parser("ble-print-image", help="print an image over BLE")
+    ble_image.add_argument("address")
+    ble_image.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_image.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
     )
+    _add_image_options(ble_image)
 
     ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
     ble_feed.add_argument("address")
@@ -76,25 +119,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that moving paper is allowed",
     )
 
-    for name in ("info", "print-test"):
+    for name in ("info", "print-test", "print-image"):
         command = subparsers.add_parser(name)
         command.add_argument("--port", required=True)
         command.add_argument("--baudrate", type=int, default=115_200)
         command.add_argument("--live", action="store_true", help="confirm physical printer access")
-        if name == "print-test":
+        if name in {"print-test", "print-image"}:
             command.add_argument(
                 "--allow-printing",
                 action="store_true",
                 help="confirm that activating the head and moving paper is allowed",
             )
+        if name == "print-test":
             command.add_argument("--height", type=int, default=32)
             command.add_argument("--line-width", type=int, default=1)
-            command.add_argument("--feed-dots", type=int, default=80)
-            command.add_argument(
-                "--encoding",
-                choices=[encoding.value for encoding in RasterEncoding],
-                default=RasterEncoding.CODE_ESC.value,
-            )
+            _add_print_options(command)
+        elif name == "print-image":
+            _add_image_options(command)
     return parser
 
 
@@ -148,7 +189,24 @@ def main(argv: list[str] | None = None) -> int:
                 )
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE print failed: {error}") from error
-        _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
+        _print_result(result, pattern)
+        return 0
+    if args.action == "ble-print-image":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        raster = _load_image_or_exit(args.image, width=args.width, threshold=args.threshold)
+        try:
+            with BleTransport(args.address) as transport:
+                result = build_application(transport).commands.execute(
+                    PrintRaster(
+                        raster,
+                        feed_dots=args.feed_dots,
+                        encoding=RasterEncoding(args.encoding),
+                    )
+                )
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE print failed: {error}") from error
+        _print_result(result, raster)
         return 0
     if args.action == "ble-feed":
         _require(args.live, "refusing Bluetooth connection without --live")
@@ -182,7 +240,19 @@ def main(argv: list[str] | None = None) -> int:
                     encoding=RasterEncoding(args.encoding),
                 )
             )
-            _print_json(asdict(result) | {"completion": result.completion.hex(" ")})
+            _print_result(result, pattern)
+            return 0
+        if args.action == "print-image":
+            _require(args.allow_printing, "refusing to print without --allow-printing")
+            raster = _load_image_or_exit(args.image, width=args.width, threshold=args.threshold)
+            result = app.commands.execute(
+                PrintRaster(
+                    raster,
+                    feed_dots=args.feed_dots,
+                    encoding=RasterEncoding(args.encoding),
+                )
+            )
+            _print_result(result, raster)
             return 0
     return _unreachable(args.action)
 

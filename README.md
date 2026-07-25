@@ -78,6 +78,17 @@ Compressed `codeESC` output is the default because the live uncompressed probe
 rendered only its first expected row. The encoding remains explicitly
 selectable for regression work.
 
+Print a Pillow-readable image over the verified BLE path:
+
+```powershell
+.venv\Scripts\tronic-printer.exe ble-print-image <printer-address> image.png `
+  --width 384 --threshold 128 --feed-dots 160 --live --allow-printing
+```
+
+The image is converted before Bluetooth is opened, resized proportionally to
+the requested dot width, converted to one-bit raster data, and sent through the
+same `PrintRaster` CQRS command available to future GUI and web adapters.
+
 ## Repository policy
 
 This repository contains only original documentation and, in later phases,

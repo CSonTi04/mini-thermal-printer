@@ -1,6 +1,8 @@
 import json
+from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from tronic_printer import cli
 from tronic_printer.infrastructure.ble import BleDevice
@@ -214,6 +216,83 @@ def test_ble_print_with_both_flags_uses_shared_application(
     assert result == 0
     assert json.loads(capsys.readouterr().out)["completion"] == "aa 0d 0a"
     assert len(printer.completed_jobs) == 1
+
+
+def test_ble_print_image_requires_both_consent_flags(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "sample.png"
+    Image.new("L", (2, 1), color=0).save(image)
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-print-image", "mock", str(image)])
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main(["ble-print-image", "mock", str(image), "--live"])
+
+    assert printer.writes == []
+
+
+def test_ble_print_image_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "sample.png"
+    pixels = Image.new("L", (2, 1))
+    pixels.putdata([0, 255])
+    pixels.save(image)
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    result = cli.main(
+        [
+            "ble-print-image",
+            "mock",
+            str(image),
+            "--width",
+            "2",
+            "--live",
+            "--allow-printing",
+        ]
+    )
+
+    assert result == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["completion"] == "aa 0d 0a"
+    assert output["width"] == 2
+    assert output["height"] == 1
+    assert len(printer.completed_jobs) == 1
+    assert printer.completed_jobs[0][2].startswith(bytes.fromhex("1F 10"))
+
+
+def test_ble_print_image_rejects_invalid_image_before_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    opened = False
+
+    def open_transport(*_args: object, **_kwargs: object) -> EmulatedPrinterTransport:
+        nonlocal opened
+        opened = True
+        return EmulatedPrinterTransport()
+
+    monkeypatch.setattr(cli, "BleTransport", open_transport)
+
+    with pytest.raises(SystemExit, match="cannot prepare image"):
+        cli.main(
+            [
+                "ble-print-image",
+                "mock",
+                str(tmp_path / "missing.png"),
+                "--live",
+                "--allow-printing",
+            ]
+        )
+
+    assert not opened
 
 
 def test_ble_feed_requires_both_consent_flags(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -92,6 +92,8 @@ tronic-printer ble-print-test <printer-address> --height 96 --line-width 3 `
   --feed-dots 160 --live --allow-printing
 tronic-printer ble-print-test <printer-address> --encoding uncompressed `
   --live --allow-printing
+tronic-printer ble-print-image <printer-address> image.png --width 384 `
+  --threshold 128 --feed-dots 160 --live --allow-printing
 tronic-printer ble-feed <printer-address> --dots 160 --live --allow-printing
 ```
 

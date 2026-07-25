@@ -147,14 +147,24 @@ Apache License 2.0 is the recommended license for the future clean-room code.
 - Visually confirmed the complete pattern, consistent line weight, side
   margins, and useful blank tear margin from the user's photograph.
 
+### Practical image CLI
+
+- Added serial and BLE image-printing commands over the shared `PrintRaster`
+  CQRS command.
+- Added proportional resizing, adjustable one-bit thresholding, and output
+  dimension reporting through the existing Pillow adapter.
+- Kept both `--live` and `--allow-printing` gates for every physical image job.
+- Verified that missing or invalid images fail before a BLE connection opens.
+- Passed 65 non-HIL tests with all six hardware tests excluded.
+
 ## Current checkpoint
 
 The official app's classic SPP print sequence and the Python driver's PC BLE
 query path and feed workaround are verified. Windows has not created a classic
 SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered,
 reproduced byte-for-byte, and verified through a complete physical multi-row
-print. The Windows BLE driver path is now functional; Debian validation is the
-next host milestone.
+print. The Windows BLE driver path and practical image-printing CLI are now
+functional; Debian validation is the next host milestone.
 
 Remaining unknowns:
 

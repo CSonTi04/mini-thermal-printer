@@ -40,7 +40,8 @@ flowchart LR
   and packet-size behavior.
 - `testing.py` provides scripted and stateful in-memory transports.
 - `cli.py` is a thin presentation adapter. It owns consent flags but no printer
-  protocol logic.
+  protocol logic. Its image-printing commands use the Pillow adapter to create
+  the same `RasterImage` accepted by GUI and web callers.
 
 ## Safety boundaries
 

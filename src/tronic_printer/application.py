@@ -124,21 +124,24 @@ class PrinterCommandHandlers:
         )
 
     def print_raster(self, command: PrintRaster) -> PrintResult:
-        status = self.queries.status(GetStatus())
-        if not status.can_print:
-            raise PrinterNotReady(f"printer status 0x{status.raw:02X} prevents printing")
-
         if command.encoding is RasterEncoding.CODE_ESC:
             raster_frame = protocol.encode_compressed_raster(command.raster)
         elif command.encoding is RasterEncoding.UNCOMPRESSED:
             raster_frame = protocol.encode_uncompressed_raster(command.raster)
         else:
             raise ValueError(f"unsupported raster encoding: {command.encoding}")
+        start_frame = protocol.start_job(command.job_mode)
+        feed_frame = protocol.feed_dots(command.feed_dots)
+
+        # Construct and validate every outbound frame before touching hardware.
+        status = self.queries.status(GetStatus())
+        if not status.can_print:
+            raise PrinterNotReady(f"printer status 0x{status.raw:02X} prevents printing")
         chunks = (
-            protocol.start_job(command.job_mode),
+            start_frame,
             protocol.WAKE_PREFIX,
             raster_frame,
-            protocol.feed_dots(command.feed_dots),
+            feed_frame,
         )
         for chunk in chunks:
             self.transport.write(chunk)

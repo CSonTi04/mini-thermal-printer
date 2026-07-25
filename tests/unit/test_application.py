@@ -99,6 +99,28 @@ def test_print_command_refuses_unsafe_status(unsafe_status: int) -> None:
     assert transport.completed_jobs == []
 
 
+@pytest.mark.parametrize(
+    "command, message",
+    [
+        (PrintRaster(RasterImage(385, 1, bytes(49))), "384-dot"),
+        (PrintRaster(RasterImage.test_pattern(), feed_dots=256), "feed"),
+        (PrintRaster(RasterImage.test_pattern(), job_mode=256), "job mode"),
+    ],
+)
+def test_print_command_validates_entire_job_before_transport_access(
+    command: PrintRaster,
+    message: str,
+) -> None:
+    transport = EmulatedPrinterTransport()
+    app = build_application(transport)
+
+    with pytest.raises(ValueError, match=message):
+        app.commands.execute(command)
+
+    assert transport.exchanges == []
+    assert transport.writes == []
+
+
 def test_unregistered_messages_fail_explicitly() -> None:
     with pytest.raises(LookupError, match="no query handler"):
         QueryBus().ask(object())
