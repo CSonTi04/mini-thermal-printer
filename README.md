@@ -121,10 +121,9 @@ to BlueZ and D-Bus.
 ## Repository policy
 
 This repository contains original documentation, clean-room implementation
-code, tests, and one separately documented user-supplied Lenna test image. The
-image is not covered by the project's Apache License 2.0; see
-[`tests/resources/README.md`](tests/resources/README.md). The repository does
-not contain the proprietary APK, decompiled sources, phone dumps, signing
+code, tests, and one separately documented public-domain image test resource;
+see [`tests/resources/README.md`](tests/resources/README.md). The repository
+does not contain the proprietary APK, decompiled sources, phone dumps, signing
 material, or extracted manuals. Those local artifacts are excluded by
 `.gitignore`.
 
@@ -142,7 +141,6 @@ Evidence labels used in the documentation:
 Copyright 2026 CSonTi04.
 
 The project's original source code and documentation are licensed under the
-[Apache License 2.0](LICENSE). The separately documented
-`tests/resources/Lenna_(test_image).png` third-party test image is excluded from
-that grant because no license information accompanied it. No proprietary app
-code or assets are included.
+[Apache License 2.0](LICENSE). The separately documented public-domain image
+test resource remains public domain and is not relicensed under Apache License
+2.0. No proprietary app code or assets are included.

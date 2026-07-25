@@ -17,8 +17,8 @@ The following constraints and preferences were supplied by the device owner:
 - Current priority: complete APK analysis.
 
 The original clean-room code and documentation are licensed under Apache
-License 2.0. The separately documented Lenna test image is excluded from that
-grant because no license information accompanied it.
+License 2.0. The separately documented image test resource is public domain and
+is not relicensed under Apache License 2.0.
 
 ## Completed
 
@@ -195,8 +195,9 @@ grant because no license information accompanied it.
 
 ### Four-style labeled image showcase
 
-- Added the user-supplied 512×512 RGB Lenna PNG as a tracked test resource with
-  a pinned SHA-256 and an explicit third-party licensing notice.
+- Added a tracked 512×512 RGB reference image with a pinned SHA-256 and explicit
+  provenance. The initial Lenna resource was later replaced by scikit-image's
+  public-domain astronaut image so the repository can be redistributed safely.
 - Added reusable showcase recipes and exact one-bit labeled page generation for
   Floyd photo, ordered newsprint, gritty noir, and outline sketch variants.
 - Added a hardware-free `prepare-showcase` command and generated all four pages

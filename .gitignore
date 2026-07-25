@@ -7,6 +7,9 @@
 /decompiled/
 /analysis-work/
 
+# Unlicensed historical test asset; use tests/resources/astronaut.png instead
+/tests/resources/Lenna_(test_image).png
+
 # Python development artifacts
 /.venv/
 /.pytest_cache/

@@ -5,11 +5,11 @@ from PIL import Image
 
 from tronic_printer.showcase import SHOWCASE_RECIPES, build_showcase_pages
 
-RESOURCE = Path(__file__).parents[1] / "resources" / "Lenna_(test_image).png"
-RESOURCE_SHA256 = "7E497501A28BCF9A353CCADF6EB9216BF098AC32888FB542FB9BFE71D486761F"
+RESOURCE = Path(__file__).parents[1] / "resources" / "astronaut.png"
+RESOURCE_SHA256 = "88431CD9653CCD539741B555FB0A46B61558B301D4110412B5BC28B5E3EA6CB5"
 
 
-def test_lenna_resource_matches_pinned_hash() -> None:
+def test_astronaut_resource_matches_pinned_hash() -> None:
     assert hashlib.sha256(RESOURCE.read_bytes()).hexdigest().upper() == RESOURCE_SHA256
 
 

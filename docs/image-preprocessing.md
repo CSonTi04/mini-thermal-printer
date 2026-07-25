@@ -48,7 +48,7 @@ Generate the four built-in comparison pages with their exact printed headers:
 
 ```powershell
 .venv\Scripts\tronic-printer.exe prepare-showcase `
-  "tests\resources\Lenna_(test_image).png" `
+  "tests\resources\astronaut.png" `
   --output-dir analysis-work\image-showcase
 ```
 
@@ -160,7 +160,7 @@ available to GUI and web presentation layers.
 ## Four-page hardware showcase
 
 The HIL rig contains a separately gated scenario that prints the four labeled
-Lenna pages as individual compressed BLE jobs. The pages contain about 255 mm
+astronaut pages as individual compressed BLE jobs. The pages contain about 255 mm
 of image and header content. Four 160-dot trailing feeds add another 80 mm, for
 an expected total near 335 mm. The scenario pauses 20 seconds between jobs by
 default and checks printer status before every page.
