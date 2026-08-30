@@ -8,6 +8,8 @@ command and query buses.
 ```mermaid
 flowchart LR
     PLUGINS["Built-in + entry-point effects"] --> PREP["Image preparation"]
+    FONTS["System or explicit font files"] --> TEXT["Unicode text layout"]
+    TEXT --> RASTER
     PREP --> RASTER["RasterImage + exact preview"]
     RASTER --> CLI
     RASTER --> GUI
@@ -41,6 +43,10 @@ flowchart LR
   effects, performs deterministic dithering, and returns both the domain raster
   and its exact preview. Installed packages can contribute effects through the
   `tronic_printer.image_effects` entry-point group.
+- `text.py` discovers system font faces or loads explicit TTF/OTF/TTC files,
+  performs measured Unicode wrapping and alignment, and produces the same
+  prepared raster contract as the image pipeline. It has no transport or
+  hardware dependency.
 - `infrastructure/serial.py` implements classic RFCOMM/SPP through a Windows or
   Linux serial device. Writes follow the official app's 16,384-byte limit.
 - `infrastructure/ble.py` provides passive discovery, metadata-only GATT
@@ -49,8 +55,8 @@ flowchart LR
   and packet-size behavior.
 - `testing.py` provides scripted and stateful in-memory transports.
 - `cli.py` is a thin presentation adapter. It owns consent flags but no printer
-  protocol logic. Its preview and image-printing commands use the same
-  preparation API available to GUI and web callers.
+  protocol logic. Its preview, image-printing, and text-printing commands use
+  the same preparation APIs available to GUI and web callers.
 
 ## Safety boundaries
 

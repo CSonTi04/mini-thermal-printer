@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageFont
 
 from tronic_printer import cli
 from tronic_printer.infrastructure.ble import BleDevice
@@ -96,6 +96,68 @@ def test_prepare_showcase_writes_four_labeled_pages_without_hardware(
         "outline-sketch",
     ]
     assert len(list(output_dir.glob("*.png"))) == 4
+
+
+def test_prepare_text_renders_unicode_font_preview_without_hardware(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    preview = tmp_path / "text.png"
+    font_path = Path(ImageFont.truetype("DejaVuSans.ttf", 12).path)
+    monkeypatch.setattr(
+        cli,
+        "BleTransport",
+        lambda *_args, **_kwargs: pytest.fail("prepare-text opened Bluetooth"),
+    )
+
+    assert (
+        cli.main(
+            [
+                "prepare-text",
+                "Pergel Dávid\nTóth András",
+                "--font-file",
+                str(font_path),
+                "--font-size",
+                "24",
+                "--align",
+                "center",
+                "--output",
+                str(preview),
+            ]
+        )
+        == 0
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["font"]["family"] == "DejaVu Sans"
+    assert output["line_count"] == 2
+    assert output["align"] == "center"
+    assert preview.is_file()
+
+
+def test_prepare_text_reads_utf8_file_and_rejects_conflicting_sources(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "message.txt"
+    preview = tmp_path / "text.png"
+    source.write_text("Árvíztűrő tükörfúrógép", encoding="utf-8")
+
+    assert cli.main(["prepare-text", "--text-file", str(source), "-o", str(preview)]) == 0
+    assert json.loads(capsys.readouterr().out)["black_pixels"] > 0
+
+    with pytest.raises(SystemExit, match="either inline text"):
+        cli.main(
+            [
+                "prepare-text",
+                "inline",
+                "--text-file",
+                str(source),
+                "-o",
+                str(preview),
+            ]
+        )
 
 
 def test_info_refuses_hardware_without_live() -> None:
@@ -366,6 +428,66 @@ def test_ble_print_image_rejects_invalid_image_before_connecting(
             ]
         )
 
+    assert not opened
+
+
+def test_ble_print_text_requires_consent_and_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-print-text", "mock", "hello"])
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main(["ble-print-text", "mock", "hello", "--live"])
+    assert printer.writes == []
+
+    assert (
+        cli.main(
+            [
+                "ble-print-text",
+                "mock",
+                "Pergel Dávid",
+                "--font-size",
+                "20",
+                "--live",
+                "--allow-printing",
+            ]
+        )
+        == 0
+    )
+    output = json.loads(capsys.readouterr().out)
+    assert output["completion"] == "aa 0d 0a"
+    assert output["text"]["font_size"] == 20
+    assert len(printer.completed_jobs) == 1
+
+
+def test_ble_print_text_rejects_invalid_font_before_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    opened = False
+
+    def open_transport(*_args: object, **_kwargs: object) -> EmulatedPrinterTransport:
+        nonlocal opened
+        opened = True
+        return EmulatedPrinterTransport()
+
+    monkeypatch.setattr(cli, "BleTransport", open_transport)
+    with pytest.raises(SystemExit, match="cannot prepare text"):
+        cli.main(
+            [
+                "ble-print-text",
+                "mock",
+                "hello",
+                "--font-file",
+                str(tmp_path / "missing.ttf"),
+                "--live",
+                "--allow-printing",
+            ]
+        )
     assert not opened
 
 

@@ -211,7 +211,25 @@ is not relicensed under Apache License 2.0.
   seconds after passive discovery confirmed advertising.
 - Four user photographs confirmed complete readable headers, complete images,
   stable alignment, distinct style output, and no visible heat dropout.
+- Repeated the four-page scenario after replacing Lenna with the public-domain
+  scikit-image astronaut resource. All four compressed BLE jobs completed in
+  89.77 seconds with 20-second cooling pauses; physical rendering inspection is
+  pending operator confirmation. See
+  [the astronaut showcase capture](captures/pc-ble-astronaut-showcase-2026-07-25.md).
 - Raised the verified compressed page-height lower bound from 96 to 538 rows.
+
+### Unicode text and font support
+
+- Added a transport-independent Unicode text renderer with measured wrapping,
+  long-word splitting, margins, line spacing, and left/center/right alignment.
+- Added explicit TTF/OTF/TTC loading and installed-family discovery for Windows,
+  Debian/Linux, and macOS, including bold/italic face selection.
+- Added hardware-free `fonts` and `prepare-text` CLI commands plus gated
+  `ble-print-text` and classic-SPP `print-text` commands.
+- Kept font rendering above the CQRS boundary: GUI and web adapters can prepare
+  the same raster and submit the existing `PrintRaster` command.
+- Added Unicode, font discovery, layout, validation, preview, consent-gate, and
+  mocked BLE print coverage.
 
 ## Current checkpoint
 

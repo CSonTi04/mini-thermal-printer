@@ -44,6 +44,7 @@ The findings are documented in:
 - [Progress and approval log](docs/progress.md)
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)
 - [Image preprocessing and effect plugins](docs/image-preprocessing.md)
+- [Unicode text and font support](docs/text-printing.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
 
@@ -95,6 +96,17 @@ Build the four labeled comparison pages without accessing hardware:
   --output-dir analysis-work\image-showcase
 ```
 
+Preview Unicode text with an installed font without accessing hardware:
+
+```powershell
+.venv\Scripts\tronic-printer.exe prepare-text "Szia, Dávid!" `
+  --font-family Arial --font-size 32 --bold --align center `
+  --output analysis-work\text-preview.png
+```
+
+List discoverable system font faces with `tronic-printer fonts`. Text can also
+come from a UTF-8 file, and explicit TTF, OTF, or TTC paths are supported.
+
 Print a Pillow-readable image over the verified BLE path, optionally saving the
 exact one-bit preview before connecting:
 
@@ -108,6 +120,11 @@ The extensible pipeline applies ordered, repeatable effects and converts the
 image before Bluetooth is opened. Built-in effects and separately installed
 entry-point plugins feed the same `RasterImage` and `PrintRaster` CQRS command
 available to future GUI and web adapters.
+
+The transport-independent text renderer provides measured Unicode wrapping,
+left/center/right alignment, margins, line spacing, family/style resolution,
+and exact one-bit previews. Its output feeds that same CQRS command, so GUI and
+web interfaces do not need to depend on BLE or serial details.
 
 All four built-in showcase recipes have been physically verified on the target
 printer as complete labeled 384×384 images. The longest successful composed

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import NoReturn
@@ -30,6 +31,14 @@ from tronic_printer.preprocessing import (
     load_prepared_image,
 )
 from tronic_printer.showcase import load_showcase_pages
+from tronic_printer.text import (
+    FontCatalog,
+    FontSpec,
+    PreparedText,
+    TextAlign,
+    TextLayoutConfig,
+    prepare_text,
+)
 
 
 def _require(flag: bool, message: str) -> None:
@@ -79,6 +88,35 @@ def _add_image_print_options(parser: argparse.ArgumentParser) -> None:
     _add_print_options(parser)
 
 
+def _add_text_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("text", nargs="?", help="Unicode text to render")
+    parser.add_argument(
+        "--text-file",
+        help="read UTF-8 text from a file, or use '-' for standard input",
+    )
+    font_source = parser.add_mutually_exclusive_group()
+    font_source.add_argument("--font-family", help="installed font family name")
+    font_source.add_argument("--font-file", type=Path, help="TTF, OTF, or TTC font file")
+    parser.add_argument("--font-size", type=int, default=28, help="font size in printer dots")
+    parser.add_argument("--bold", action="store_true", help="request a bold family face")
+    parser.add_argument("--italic", action="store_true", help="request an italic family face")
+    parser.add_argument(
+        "--align",
+        choices=[alignment.value for alignment in TextAlign],
+        default=TextAlign.LEFT.value,
+    )
+    parser.add_argument("--width", type=int, default=384, help="output width in dots")
+    parser.add_argument("--margin", type=int, default=12, help="left/right/top/bottom margin")
+    parser.add_argument("--line-spacing", type=int, default=4, help="extra dots between lines")
+    parser.add_argument("--threshold", type=int, default=180, help="black threshold from 0 to 255")
+
+
+def _add_text_print_options(parser: argparse.ArgumentParser) -> None:
+    _add_text_options(parser)
+    parser.add_argument("--preview", help="save the exact one-bit raster PNG before connecting")
+    _add_print_options(parser)
+
+
 def _prepare_image_or_exit(args: argparse.Namespace) -> PreparedImage:
     try:
         config = ImagePreparationConfig(
@@ -97,6 +135,49 @@ def _prepare_image_or_exit(args: argparse.Namespace) -> PreparedImage:
         return prepared
     except (ImportError, OSError, TypeError, ValueError) as error:
         raise SystemExit(f"cannot prepare image: {error}") from error
+
+
+def _read_text_or_exit(args: argparse.Namespace) -> str:
+    if args.text is not None and args.text_file is not None:
+        raise SystemExit("choose either inline text or --text-file, not both")
+    if args.text_file == "-":
+        value = sys.stdin.read()
+    elif args.text_file is not None:
+        try:
+            value = Path(args.text_file).read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            raise SystemExit(f"cannot read text file: {error}") from error
+    elif args.text is not None:
+        value = args.text
+    else:
+        raise SystemExit("text is required (inline or via --text-file)")
+    return value
+
+
+def _prepare_text_or_exit(args: argparse.Namespace) -> PreparedText:
+    try:
+        prepared = prepare_text(
+            _read_text_or_exit(args),
+            FontSpec(
+                size=args.font_size,
+                family=args.font_family,
+                path=args.font_file,
+                bold=args.bold,
+                italic=args.italic,
+            ),
+            TextLayoutConfig(
+                width=args.width,
+                margin=args.margin,
+                line_spacing=args.line_spacing,
+                align=TextAlign(args.align),
+            ),
+            threshold=args.threshold,
+        )
+        if getattr(args, "preview", None):
+            prepared.prepared.save_preview(args.preview)
+        return prepared
+    except (OSError, TypeError, ValueError) as error:
+        raise SystemExit(f"cannot prepare text: {error}") from error
 
 
 def _print_result(result: PrintResult, raster: RasterImage) -> None:
@@ -120,6 +201,19 @@ def _prepared_print_result(result: PrintResult, prepared: PreparedImage) -> None
     _print_json(values)
 
 
+def _prepared_text_summary(prepared: PreparedText) -> dict[str, object]:
+    return prepared.summary() | {
+        "code_esc_frame_bytes": len(protocol.encode_compressed_raster(prepared.prepared.raster))
+    }
+
+
+def _prepared_text_print_result(result: PrintResult, prepared: PreparedText) -> None:
+    values = asdict(result)
+    values["completion"] = result.completion.hex(" ")
+    values["text"] = _prepared_text_summary(prepared)
+    _print_json(values)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tronic-printer")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -127,12 +221,22 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("ports", help="list operating-system serial ports")
     subparsers.add_parser("image-effects", help="list built-in and installed image effects")
 
+    fonts = subparsers.add_parser("fonts", help="list discoverable system font faces")
+    fonts.add_argument("--family", help="filter by family name")
+
     prepare = subparsers.add_parser(
         "prepare-image",
         help="prepare and preview the exact raster without hardware access",
     )
     _add_preparation_options(prepare)
     prepare.add_argument("--output", "-o", required=True, help="destination PNG preview")
+
+    prepare_text_parser = subparsers.add_parser(
+        "prepare-text",
+        help="render Unicode text to an exact print preview without hardware access",
+    )
+    _add_text_options(prepare_text_parser)
+    prepare_text_parser.add_argument("--output", "-o", required=True, help="destination PNG")
 
     showcase = subparsers.add_parser(
         "prepare-showcase",
@@ -177,6 +281,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_image_print_options(ble_image)
 
+    ble_text = subparsers.add_parser(
+        "ble-print-text",
+        help="render and print Unicode text over BLE",
+    )
+    ble_text.add_argument("address")
+    ble_text.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_text.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
+    )
+    _add_text_print_options(ble_text)
+
     ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
     ble_feed.add_argument("address")
     ble_feed.add_argument("--dots", type=int, default=80)
@@ -187,12 +304,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that moving paper is allowed",
     )
 
-    for name in ("info", "print-test", "print-image"):
+    for name in ("info", "print-test", "print-image", "print-text"):
         command = subparsers.add_parser(name)
         command.add_argument("--port", required=True)
         command.add_argument("--baudrate", type=int, default=115_200)
         command.add_argument("--live", action="store_true", help="confirm physical printer access")
-        if name in {"print-test", "print-image"}:
+        if name in {"print-test", "print-image", "print-text"}:
             command.add_argument(
                 "--allow-printing",
                 action="store_true",
@@ -204,6 +321,8 @@ def build_parser() -> argparse.ArgumentParser:
             _add_print_options(command)
         elif name == "print-image":
             _add_image_print_options(command)
+        elif name == "print-text":
+            _add_text_print_options(command)
     return parser
 
 
@@ -218,6 +337,12 @@ def main(argv: list[str] | None = None) -> int:
         except (ImportError, TypeError, ValueError) as error:
             raise SystemExit(f"cannot load image effects: {error}") from error
         return 0
+    if args.action == "fonts":
+        try:
+            _print_json(FontCatalog().describe(args.family))
+        except OSError as error:
+            raise SystemExit(f"cannot discover fonts: {error}") from error
+        return 0
     if args.action == "prepare-image":
         prepared = _prepare_image_or_exit(args)
         try:
@@ -225,6 +350,16 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as error:
             raise SystemExit(f"cannot save preview: {error}") from error
         _print_json(_prepared_summary(prepared) | {"preview": str(Path(args.output))})
+        return 0
+    if args.action == "prepare-text":
+        prepared_text = _prepare_text_or_exit(args)
+        try:
+            prepared_text.prepared.save_preview(Path(args.output))
+        except OSError as error:
+            raise SystemExit(f"cannot save preview: {error}") from error
+        _print_json(
+            _prepared_text_summary(prepared_text) | {"preview": str(Path(args.output))}
+        )
         return 0
     if args.action == "prepare-showcase":
         output_dir = Path(args.output_dir)
@@ -304,6 +439,23 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"BLE print failed: {error}") from error
         _prepared_print_result(result, prepared)
         return 0
+    if args.action == "ble-print-text":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        prepared_text = _prepare_text_or_exit(args)
+        try:
+            with BleTransport(args.address) as transport:
+                result = build_application(transport).commands.execute(
+                    PrintRaster(
+                        prepared_text.prepared.raster,
+                        feed_dots=args.feed_dots,
+                        encoding=RasterEncoding(args.encoding),
+                    )
+                )
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE print failed: {error}") from error
+        _prepared_text_print_result(result, prepared_text)
+        return 0
     if args.action == "ble-feed":
         _require(args.live, "refusing Bluetooth connection without --live")
         _require(args.allow_printing, "refusing to move paper without --allow-printing")
@@ -328,6 +480,21 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         _prepared_print_result(result, prepared)
+        return 0
+
+    if args.action == "print-text":
+        _require(args.live, "refusing hardware access without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        prepared_text = _prepare_text_or_exit(args)
+        with SerialTransport(args.port, baudrate=args.baudrate) as transport:
+            result = build_application(transport).commands.execute(
+                PrintRaster(
+                    prepared_text.prepared.raster,
+                    feed_dots=args.feed_dots,
+                    encoding=RasterEncoding(args.encoding),
+                )
+            )
+        _prepared_text_print_result(result, prepared_text)
         return 0
 
     with _serial_transport(args) as transport:
