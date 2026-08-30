@@ -1,5 +1,7 @@
 # Lidl TRONIC Mini Pocket Printer
 
+[![CI](https://github.com/CSonTi04/mini-thermal-printer/actions/workflows/ci.yml/badge.svg)](https://github.com/CSonTi04/mini-thermal-printer/actions/workflows/ci.yml)
+
 Clean-room reverse engineering and an open Python implementation for the Lidl
 TRONIC Mini Pocket Printer.
 
@@ -47,6 +49,7 @@ The findings are documented in:
 - [Unicode text and font support](docs/text-printing.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
+- [Continuous integration and delivery](docs/ci-cd.md)
 
 Remaining generic SDK behavior is not presented as live hardware validation.
 The first Python implementation is structured around CQRS messages and a
