@@ -102,9 +102,9 @@ def test_prepare_text_renders_unicode_font_preview_without_hardware(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    unicode_font_path: Path,
 ) -> None:
     preview = tmp_path / "text.png"
-    font_path = Path(ImageFont.truetype("DejaVuSans.ttf", 12).path)
     monkeypatch.setattr(
         cli,
         "BleTransport",
@@ -117,7 +117,7 @@ def test_prepare_text_renders_unicode_font_preview_without_hardware(
                 "prepare-text",
                 "Pergel Dávid\nTóth András",
                 "--font-file",
-                str(font_path),
+                str(unicode_font_path),
                 "--font-size",
                 "24",
                 "--align",
@@ -130,7 +130,10 @@ def test_prepare_text_renders_unicode_font_preview_without_hardware(
     )
 
     output = json.loads(capsys.readouterr().out)
-    assert output["font"]["family"] == "DejaVu Sans"
+    assert output["font"]["family"] == ImageFont.truetype(
+        unicode_font_path,
+        12,
+    ).getname()[0]
     assert output["line_count"] == 2
     assert output["align"] == "center"
     assert preview.is_file()

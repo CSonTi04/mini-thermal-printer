@@ -1,9 +1,36 @@
+import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+from PIL import ImageFont
 
 from tronic_printer.infrastructure.ble import BleTransport
 from tronic_printer.infrastructure.serial import SerialTransport
+
+
+@pytest.fixture
+def unicode_font_path() -> Path:
+    """Return a Unicode TrueType font available on common CI and dev hosts."""
+    windows_root = Path(os.environ.get("WINDIR", "C:/Windows"))
+    candidates = (
+        windows_root / "Fonts" / "arial.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/dejavu/DejaVuSans.ttf"),
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            ImageFont.truetype(candidate, 12)
+            return candidate
+
+    try:
+        loaded = ImageFont.truetype("DejaVuSans.ttf", 12)
+    except OSError:
+        pytest.skip("no suitable Unicode TrueType font is installed")
+    font_path = Path(loaded.path)
+    if not font_path.is_file():
+        pytest.skip("Pillow's resolved test font has no accessible file")
+    return font_path
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
