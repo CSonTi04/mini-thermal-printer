@@ -47,6 +47,7 @@ The findings are documented in:
 - [Mock and hardware-in-the-loop test rigs](docs/testing.md)
 - [Image preprocessing and effect plugins](docs/image-preprocessing.md)
 - [Unicode text and font support](docs/text-printing.md)
+- [HTML receipt templates](docs/html-templating.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
 - [Continuous integration and delivery](docs/ci-cd.md)
@@ -106,6 +107,20 @@ Preview Unicode text with an installed font without accessing hardware:
   --font-family Arial --font-size 32 --bold --align center `
   --output analysis-work\text-preview.png
 ```
+
+Render a sandboxed Jinja HTML receipt at one CSS pixel per printer dot:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[html]"
+.venv\Scripts\tronic-printer.exe prepare-html `
+  examples\receipt\receipt.html --data examples\receipt\data.json `
+  --output analysis-work\receipt.png
+```
+
+The HTML path includes a 384-dot CSS layout contract, local-only assets,
+automation-friendly JSON data and overrides, and optional per-picture dithering.
+JavaScript and remote browser requests are disabled. See the template guide for
+the provided classes, browser fallback setup, and printing commands.
 
 List discoverable system font faces with `tronic-printer fonts`. Text can also
 come from a UTF-8 file, and explicit TTF, OTF, or TTC paths are supported.

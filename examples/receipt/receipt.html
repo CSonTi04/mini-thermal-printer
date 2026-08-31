@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root {
+        --page-padding: 16px;
+        --font-family: "Arial", sans-serif;
+        --font-size: 15px;
+      }
+
+      h1 { margin: 4px 0; font-size: 26px; }
+      .logo { width: 52px; height: 52px; }
+      .rule { border-top: 2px dashed black; }
+      .item-name { flex: 1; }
+      .total { font-size: 21px; font-weight: 700; }
+      .muted { color: #555; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column">
+      <header class="text-center no-break">
+        <img class="logo" src="logo.svg" alt="Store logo">
+        <h1>{{ store.name }}</h1>
+        <div>{{ store.address }}</div>
+      </header>
+
+      <div class="row space-between muted">
+        <span>{{ receipt.number }}</span>
+        <span>{{ receipt.date }}</span>
+      </div>
+
+      <div class="rule mt-1"></div>
+      {% for item in items %}
+        <div class="row space-between no-break">
+          <span class="item-name">{{ item.quantity }} × {{ item.name }}</span>
+          <span>{{ "%.2f" | format(item.total) }}</span>
+        </div>
+      {% endfor %}
+      <div class="rule mb-1"></div>
+
+      <div class="row space-between total no-break">
+        <span>Total</span>
+        <span>{{ currency }} {{ "%.2f" | format(total) }}</span>
+      </div>
+
+      {% if photo is defined and photo %}
+        <img
+          class="photo mt-2"
+          src="{{ printer_image(photo, width=352, dither='floyd-steinberg') }}"
+          alt="Receipt photograph"
+        >
+      {% endif %}
+
+      <footer class="text-center mt-2">{{ footer }}</footer>
+    </main>
+  </body>
+</html>

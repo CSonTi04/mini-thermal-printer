@@ -13,6 +13,13 @@ from typing import NoReturn
 from tronic_printer import protocol
 from tronic_printer.application import build_application
 from tronic_printer.domain import RasterImage
+from tronic_printer.html_template import (
+    HtmlTemplateConfig,
+    PreparedHtml,
+    load_template_data,
+    parse_template_values,
+    prepare_html,
+)
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
 from tronic_printer.messages import (
@@ -117,6 +124,39 @@ def _add_text_print_options(parser: argparse.ArgumentParser) -> None:
     _add_print_options(parser)
 
 
+def _add_html_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("template", help="Jinja HTML template containing one .receipt element")
+    parser.add_argument("--data", help="JSON object file used as template data, or '-' for stdin")
+    parser.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        dest="template_values",
+        metavar="NAME=VALUE",
+        help="set or override a template value; VALUE accepts JSON syntax",
+    )
+    parser.add_argument("--threshold", type=int, default=180, help="black threshold from 0 to 255")
+    parser.add_argument(
+        "--dither",
+        choices=[mode.value for mode in DitherMode],
+        default=DitherMode.THRESHOLD.value,
+        help="final whole-receipt monochrome conversion",
+    )
+    parser.add_argument(
+        "--effect",
+        action="append",
+        default=[],
+        metavar="NAME[:KEY=VALUE,...]",
+        help="apply an effect to the rendered receipt; repeat for an ordered chain",
+    )
+
+
+def _add_html_print_options(parser: argparse.ArgumentParser) -> None:
+    _add_html_options(parser)
+    parser.add_argument("--preview", help="save the exact one-bit raster before connecting")
+    _add_print_options(parser)
+
+
 def _prepare_image_or_exit(args: argparse.Namespace) -> PreparedImage:
     try:
         config = ImagePreparationConfig(
@@ -180,6 +220,26 @@ def _prepare_text_or_exit(args: argparse.Namespace) -> PreparedText:
         raise SystemExit(f"cannot prepare text: {error}") from error
 
 
+def _prepare_html_or_exit(args: argparse.Namespace) -> PreparedHtml:
+    try:
+        data = load_template_data(args.data)
+        data.update(parse_template_values(args.template_values))
+        prepared = prepare_html(
+            args.template,
+            data,
+            HtmlTemplateConfig(
+                threshold=args.threshold,
+                dither=DitherMode(args.dither),
+                effects=tuple(EffectSpec.parse(value) for value in args.effect),
+            ),
+        )
+        if getattr(args, "preview", None):
+            prepared.save_preview(args.preview)
+        return prepared
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError) as error:
+        raise SystemExit(f"cannot prepare HTML: {error}") from error
+
+
 def _print_result(result: PrintResult, raster: RasterImage) -> None:
     values = asdict(result)
     values["completion"] = result.completion.hex(" ")
@@ -214,6 +274,19 @@ def _prepared_text_print_result(result: PrintResult, prepared: PreparedText) -> 
     _print_json(values)
 
 
+def _prepared_html_summary(prepared: PreparedHtml) -> dict[str, object]:
+    return prepared.summary() | {
+        "code_esc_frame_bytes": len(protocol.encode_compressed_raster(prepared.raster))
+    }
+
+
+def _prepared_html_print_result(result: PrintResult, prepared: PreparedHtml) -> None:
+    values = asdict(result)
+    values["completion"] = result.completion.hex(" ")
+    values["html"] = _prepared_html_summary(prepared)
+    _print_json(values)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tronic-printer")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -237,6 +310,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_text_options(prepare_text_parser)
     prepare_text_parser.add_argument("--output", "-o", required=True, help="destination PNG")
+
+    prepare_html_parser = subparsers.add_parser(
+        "prepare-html",
+        help="render a Jinja HTML receipt to an exact print preview",
+    )
+    _add_html_options(prepare_html_parser)
+    prepare_html_parser.add_argument("--output", "-o", required=True, help="destination PNG")
 
     showcase = subparsers.add_parser(
         "prepare-showcase",
@@ -294,6 +374,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_text_print_options(ble_text)
 
+    ble_html = subparsers.add_parser(
+        "ble-print-html",
+        help="render and print a Jinja HTML receipt over BLE",
+    )
+    ble_html.add_argument("address")
+    ble_html.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_html.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
+    )
+    _add_html_print_options(ble_html)
+
     ble_feed = subparsers.add_parser("ble-feed", help="advance paper over BLE")
     ble_feed.add_argument("address")
     ble_feed.add_argument("--dots", type=int, default=80)
@@ -304,12 +397,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that moving paper is allowed",
     )
 
-    for name in ("info", "print-test", "print-image", "print-text"):
+    for name in ("info", "print-test", "print-image", "print-text", "print-html"):
         command = subparsers.add_parser(name)
         command.add_argument("--port", required=True)
         command.add_argument("--baudrate", type=int, default=115_200)
         command.add_argument("--live", action="store_true", help="confirm physical printer access")
-        if name in {"print-test", "print-image", "print-text"}:
+        if name in {"print-test", "print-image", "print-text", "print-html"}:
             command.add_argument(
                 "--allow-printing",
                 action="store_true",
@@ -323,6 +416,8 @@ def build_parser() -> argparse.ArgumentParser:
             _add_image_print_options(command)
         elif name == "print-text":
             _add_text_print_options(command)
+        elif name == "print-html":
+            _add_html_print_options(command)
     return parser
 
 
@@ -359,6 +454,16 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"cannot save preview: {error}") from error
         _print_json(
             _prepared_text_summary(prepared_text) | {"preview": str(Path(args.output))}
+        )
+        return 0
+    if args.action == "prepare-html":
+        prepared_html = _prepare_html_or_exit(args)
+        try:
+            prepared_html.save_preview(Path(args.output))
+        except OSError as error:
+            raise SystemExit(f"cannot save preview: {error}") from error
+        _print_json(
+            _prepared_html_summary(prepared_html) | {"preview": str(Path(args.output))}
         )
         return 0
     if args.action == "prepare-showcase":
@@ -456,6 +561,23 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"BLE print failed: {error}") from error
         _prepared_text_print_result(result, prepared_text)
         return 0
+    if args.action == "ble-print-html":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        prepared_html = _prepare_html_or_exit(args)
+        try:
+            with BleTransport(args.address) as transport:
+                result = build_application(transport).commands.execute(
+                    PrintRaster(
+                        prepared_html.raster,
+                        feed_dots=args.feed_dots,
+                        encoding=RasterEncoding(args.encoding),
+                    )
+                )
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE print failed: {error}") from error
+        _prepared_html_print_result(result, prepared_html)
+        return 0
     if args.action == "ble-feed":
         _require(args.live, "refusing Bluetooth connection without --live")
         _require(args.allow_printing, "refusing to move paper without --allow-printing")
@@ -495,6 +617,21 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         _prepared_text_print_result(result, prepared_text)
+        return 0
+
+    if args.action == "print-html":
+        _require(args.live, "refusing hardware access without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        prepared_html = _prepare_html_or_exit(args)
+        with SerialTransport(args.port, baudrate=args.baudrate) as transport:
+            result = build_application(transport).commands.execute(
+                PrintRaster(
+                    prepared_html.raster,
+                    feed_dots=args.feed_dots,
+                    encoding=RasterEncoding(args.encoding),
+                )
+            )
+        _prepared_html_print_result(result, prepared_html)
         return 0
 
     with _serial_transport(args) as transport:

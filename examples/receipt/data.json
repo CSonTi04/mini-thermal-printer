@@ -1,0 +1,18 @@
+{
+  "store": {
+    "name": "Tiny Corner Shop",
+    "address": "12 Paper Street"
+  },
+  "receipt": {
+    "number": "Receipt #0042",
+    "date": "2026-08-31 18:45"
+  },
+  "items": [
+    {"quantity": 1, "name": "Notebook", "total": 3.5},
+    {"quantity": 2, "name": "Black tea", "total": 5.8},
+    {"quantity": 1, "name": "Postal stamp", "total": 1.2}
+  ],
+  "currency": "EUR",
+  "total": 10.5,
+  "footer": "Thank you!"
+}

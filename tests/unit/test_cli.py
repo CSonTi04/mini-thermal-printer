@@ -5,7 +5,9 @@ import pytest
 from PIL import Image, ImageFont
 
 from tronic_printer import cli
+from tronic_printer.html_template import PreparedHtml
 from tronic_printer.infrastructure.ble import BleDevice
+from tronic_printer.preprocessing import ImagePreparationConfig, prepare_image
 from tronic_printer.testing import EmulatedPrinterTransport
 
 
@@ -161,6 +163,62 @@ def test_prepare_text_reads_utf8_file_and_rejects_conflicting_sources(
                 str(preview),
             ]
         )
+
+
+def test_prepare_html_merges_json_and_set_values_without_hardware(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    template = tmp_path / "receipt.html"
+    template.write_text('<main class="receipt"></main>', encoding="utf-8")
+    data = tmp_path / "data.json"
+    data.write_text('{"title": "old", "count": 1}', encoding="utf-8")
+    preview = tmp_path / "preview.png"
+    captured: dict[str, object] = {}
+
+    def fake_prepare_html(
+        path: str,
+        values: dict[str, object],
+        config: object,
+    ) -> PreparedHtml:
+        captured.update(values)
+        prepared = prepare_image(
+            Image.new("L", (384, 2), color=255),
+            ImagePreparationConfig(width=384),
+        )
+        return PreparedHtml(prepared=prepared, template=Path(path).resolve())
+
+    monkeypatch.setattr(cli, "prepare_html", fake_prepare_html)
+    monkeypatch.setattr(
+        cli,
+        "BleTransport",
+        lambda *_args, **_kwargs: pytest.fail("prepare-html opened Bluetooth"),
+    )
+
+    assert (
+        cli.main(
+            [
+                "prepare-html",
+                str(template),
+                "--data",
+                str(data),
+                "--set",
+                "title=new",
+                "--set",
+                "count=2",
+                "-o",
+                str(preview),
+            ]
+        )
+        == 0
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert captured == {"title": "new", "count": 2}
+    assert output["width"] == 384
+    assert output["template"] == str(template.resolve())
+    assert preview.is_file()
 
 
 def test_info_refuses_hardware_without_live() -> None:
@@ -492,6 +550,79 @@ def test_ble_print_text_rejects_invalid_font_before_connecting(
             ]
         )
     assert not opened
+
+
+def test_ble_print_html_requires_consent_and_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    template = tmp_path / "receipt.html"
+    template.write_text('<main class="receipt"></main>', encoding="utf-8")
+    prepared_image = prepare_image(
+        Image.new("L", (384, 2), color=255),
+        ImagePreparationConfig(width=384),
+    )
+    prepared_html = PreparedHtml(prepared=prepared_image, template=template.resolve())
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+    monkeypatch.setattr(cli, "prepare_html", lambda *_args, **_kwargs: prepared_html)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-print-html", "mock", str(template)])
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main(["ble-print-html", "mock", str(template), "--live"])
+    assert printer.writes == []
+
+    assert (
+        cli.main(
+            [
+                "ble-print-html",
+                "mock",
+                str(template),
+                "--live",
+                "--allow-printing",
+            ]
+        )
+        == 0
+    )
+    output = json.loads(capsys.readouterr().out)
+    assert output["completion"] == "aa 0d 0a"
+    assert output["html"]["width"] == 384
+    assert len(printer.completed_jobs) == 1
+
+
+def test_serial_print_html_uses_shared_application(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    template = tmp_path / "receipt.html"
+    template.write_text('<main class="receipt"></main>', encoding="utf-8")
+    prepared_image = prepare_image(
+        Image.new("L", (384, 2), color=255),
+        ImagePreparationConfig(width=384),
+    )
+    prepared_html = PreparedHtml(prepared=prepared_image, template=template.resolve())
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)
+    monkeypatch.setattr(cli, "prepare_html", lambda *_args, **_kwargs: prepared_html)
+
+    assert (
+        cli.main(
+            [
+                "print-html",
+                "--port",
+                "COM7",
+                str(template),
+                "--live",
+                "--allow-printing",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["html"]["height"] == 2
+    assert len(printer.completed_jobs) == 1
 
 
 def test_ble_feed_requires_both_consent_flags(monkeypatch: pytest.MonkeyPatch) -> None:
