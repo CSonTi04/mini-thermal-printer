@@ -36,12 +36,12 @@ release notes and attaches both the wheel and source distribution. It uses the
 repository-scoped `GITHUB_TOKEN`; no external package-registry credential is
 required or configured.
 
-To release version `0.1.0` after its version change has passed CI and reached
+To release version `0.2.0` after its version change has passed CI and reached
 `master`:
 
 ```powershell
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v0.2.0 -m "Release v0.2.0"
+git push origin v0.2.0
 ```
 
 Do not move or reuse a published release tag. If the package version and tag
