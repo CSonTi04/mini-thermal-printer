@@ -32,7 +32,9 @@ recovered and verified:
 - a physically verified multi-row compressed BLE calibration print;
 - the app's resize, threshold, gamma, and error-diffusion pipeline; and
 - native-library exports, app permissions, network surfaces, and signing
-  provenance.
+  provenance; and
+- physically verified HTML rendering for all nine gallery templates over the
+  classic Bluetooth SPP transport.
 
 The findings are documented in:
 
@@ -118,9 +120,19 @@ Render a sandboxed Jinja HTML receipt at one CSS pixel per printer dot:
 ```
 
 The HTML path includes a 384-dot CSS layout contract, local-only assets,
-automation-friendly JSON data and overrides, and optional per-picture dithering.
-JavaScript and remote browser requests are disabled. See the template guide for
-the provided classes, browser fallback setup, and printing commands.
+automation-friendly JSON data and overrides, per-picture dithering, and local
+QR/Code 128 generation. JavaScript and remote browser requests are disabled.
+See the template guide and the shipping-label, checklist, kitchen-ticket,
+inventory-label, event-ticket, postcard-address, parcel-drop-in, and photo-note
+examples in the gallery.
+
+Installed packages include the gallery. List it or copy a starter into a new
+editable directory without cloning the repository:
+
+```powershell
+tronic-printer templates
+tronic-printer copy-template shipping-label my-shipping-label
+```
 
 List discoverable system font faces with `tronic-printer fonts`. Text can also
 come from a UTF-8 file, and explicit TTF, OTF, or TTC paths are supported.
@@ -144,9 +156,9 @@ left/center/right alignment, margins, line spacing, family/style resolution,
 and exact one-bit previews. Its output feeds that same CQRS command, so GUI and
 web interfaces do not need to depend on BLE or serial details.
 
-All four built-in showcase recipes have been physically verified on the target
-printer as complete labeled 384×384 images. The longest successful composed
-page was 538 raster rows.
+All four built-in showcase recipes and all nine HTML gallery templates have
+been physically verified on the target printer. The longest successful
+composed page was 538 raster rows.
 
 The package, CLI, linter, and complete mocked test rig also pass under Python
 3.12 on Ubuntu 24.04/WSL2. This validates Debian-family userspace portability;

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tronic-mini-printer"
-version = "0.2.0"
+version = "0.3.0"
 description = "Clean-room Python driver for the Lidl TRONIC Mini Pocket Printer"
 readme = "README.md"
 license = "Apache-2.0"
@@ -24,12 +24,16 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
+    "python-barcode>=0.15,<1",
     "pytest>=8,<10",
     "pytest-cov>=5,<8",
     "ruff>=0.9,<1",
+    "segno>=1.6,<2",
 ]
 html = [
     "playwright>=1.50,<2",
+    "python-barcode>=0.15,<1",
+    "segno>=1.6,<2",
 ]
 
 [project.scripts]
@@ -37,6 +41,18 @@ tronic-printer = "tronic_printer.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/tronic-mini-printer/examples" = ["examples/README.md"]
+"share/tronic-mini-printer/examples/receipt" = ["examples/receipt/*"]
+"share/tronic-mini-printer/examples/shipping-label" = ["examples/shipping-label/*"]
+"share/tronic-mini-printer/examples/postcard-address" = ["examples/postcard-address/*"]
+"share/tronic-mini-printer/examples/parcel-drop-in" = ["examples/parcel-drop-in/*"]
+"share/tronic-mini-printer/examples/checklist" = ["examples/checklist/*"]
+"share/tronic-mini-printer/examples/kitchen-ticket" = ["examples/kitchen-ticket/*"]
+"share/tronic-mini-printer/examples/inventory-label" = ["examples/inventory-label/*"]
+"share/tronic-mini-printer/examples/event-ticket" = ["examples/event-ticket/*"]
+"share/tronic-mini-printer/examples/photo-note" = ["examples/photo-note/*"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"

@@ -1,0 +1,11 @@
+{
+  "item": {
+    "name": "M3 × 8 socket screw",
+    "sku": "HW-M3X8-0042",
+    "location": "BIN A-17",
+    "quantity": 14,
+    "unit": "pcs",
+    "reorder_at": 20,
+    "lookup_url": "https://example.test/inventory/HW-M3X8-0042"
+  }
+}

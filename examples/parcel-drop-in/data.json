@@ -1,0 +1,13 @@
+{
+  "sender": {
+    "name": "Csonka Tamás",
+    "phone": "+36 30 555 0142",
+    "email": "tamas@example.test"
+  },
+  "receiver": {
+    "name": "Alex Morgan",
+    "phone": "+31 6 1234 5678",
+    "email": "alex.morgan@example.test"
+  },
+  "tracking_number": "DROP-2026-0042"
+}

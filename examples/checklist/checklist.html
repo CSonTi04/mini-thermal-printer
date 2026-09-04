@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 16px; --font-size: 16px; }
+      h1 { margin: 0; font-size: 27px; }
+      .meta { font-size: 13px; }
+      .section-title { margin: 8px 0 2px; border-bottom: 2px solid black; font-size: 18px; }
+      .task { align-items: flex-start; padding-block: 3px; }
+      .box { width: 18px; height: 18px; flex: 0 0 18px; border: 2px solid black; text-align: center; line-height: 14px; font-weight: 800; }
+      .task--done .label { text-decoration: line-through; }
+      .task--priority .label { font-weight: 800; }
+      .priority { border: 2px solid black; padding: 0 3px; font-size: 10px; font-weight: 800; }
+      .notes { min-height: 54px; background: repeating-linear-gradient(white 0 17px, black 18px 19px); }
+      .progress { border: 2px solid black; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column">
+      <header class="no-break">
+        <h1>{{ title }}</h1>
+        <div class="row space-between meta"><span>{{ date }}</span><span>{{ owner }}</span></div>
+      </header>
+
+      {% set completed = namespace(value=0) %}
+      {% set total = namespace(value=0) %}
+      {% for section in sections %}
+        <section class="no-break">
+          <h2 class="section-title">{{ section.title }}</h2>
+          {% for task in section.tasks %}
+            {% set total.value = total.value + 1 %}
+            {% if task.done %}{% set completed.value = completed.value + 1 %}{% endif %}
+            <div class="row task {% if task.done %}task--done{% endif %} {% if task.priority %}task--priority{% endif %}">
+              <span class="box">{% if task.done %}✓{% endif %}</span>
+              <span class="label">{{ task.label }}</span>
+              {% if task.priority %}<span class="priority">PRIORITY</span>{% endif %}
+            </div>
+          {% endfor %}
+        </section>
+      {% endfor %}
+
+      <section class="no-break">
+        <h2 class="section-title">Notes</h2>
+        <div class="notes"></div>
+      </section>
+      <div class="progress text-center p-2">{{ completed.value }} / {{ total.value }} complete</div>
+      {% if footer %}<footer class="text-center meta">{{ footer }}</footer>{% endif %}
+    </main>
+  </body>
+</html>

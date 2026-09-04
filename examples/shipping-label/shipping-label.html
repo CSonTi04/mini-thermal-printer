@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 12px; --font-size: 14px; }
+      .label { border: 3px solid black; }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .recipient { font-size: 21px; font-weight: 700; line-height: 1.15; }
+      .address { font-size: 17px; line-height: 1.25; }
+      .service { border: 3px solid black; font-size: 22px; font-weight: 800; }
+      .metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+      .value { display: block; font-size: 16px; font-weight: 700; }
+      .codes { align-items: center; gap: 8px; }
+      .codes .qr-code { flex: 0 0 auto; }
+      .codes .barcode { min-width: 0; flex: 1; }
+      .warning { border: 3px solid black; font-size: 20px; font-weight: 800; }
+      .rule { border-top: 2px solid black; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column label">
+      <div class="row space-between">
+        <span class="eyebrow">From</span>
+        <span>{{ shipment.reference }}</span>
+      </div>
+      <div class="no-break">
+        <strong>{{ sender.name }}</strong><br>
+        {{ sender.address }}<br>
+        {{ sender.postal_code }} {{ sender.city }}, {{ sender.country }}
+      </div>
+
+      <div class="rule mt-1"></div>
+      <div class="eyebrow">Ship to</div>
+      <section class="no-break">
+        <div class="recipient">{{ recipient.name }}</div>
+        <div class="address">
+          {{ recipient.address }}<br>
+          {% if recipient.address_2 %}{{ recipient.address_2 }}<br>{% endif %}
+          {{ recipient.postal_code }} {{ recipient.city }}<br>
+          {{ recipient.country }}
+        </div>
+      </section>
+
+      <div class="service text-center p-2">{{ shipment.service }}</div>
+      <div class="metadata no-break">
+        <div><span class="eyebrow">Weight</span><span class="value">{{ shipment.weight }}</span></div>
+        <div><span class="eyebrow">Pieces</span><span class="value">{{ shipment.pieces }}</span></div>
+      </div>
+
+      <div class="row codes no-break">
+        <img class="machine-code qr-code" src="{{ qr_code(shipment.tracking_url, scale=2) }}" alt="Tracking QR code">
+        <img class="machine-code barcode" src="{{ barcode(shipment.tracking_number, module_height=10, include_text=false) }}" alt="Tracking barcode">
+      </div>
+      <div class="text-center"><strong>{{ shipment.tracking_number }}</strong></div>
+
+      {% if shipment.fragile %}<div class="warning text-center p-2">FRAGILE</div>{% endif %}
+      {% if shipment.notes %}<div><span class="eyebrow">Instructions</span><br>{{ shipment.notes }}</div>{% endif %}
+    </main>
+  </body>
+</html>

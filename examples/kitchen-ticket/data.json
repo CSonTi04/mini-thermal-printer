@@ -1,0 +1,16 @@
+{
+  "order": {
+    "number": "42",
+    "type": "TAKEAWAY",
+    "placed_at": "18:47",
+    "customer": "Alex"
+  },
+  "items": [
+    {"quantity": 2, "name": "Mushroom burger", "modifiers": ["No onion", "Extra pickles"]},
+    {"quantity": 1, "name": "House fries", "modifiers": ["Well done"]},
+    {"quantity": 1, "name": "Lemon soda", "modifiers": ["No ice"]}
+  ],
+  "allergy": "sesame",
+  "notes": "Pack sauces separately.",
+  "paid": true
+}

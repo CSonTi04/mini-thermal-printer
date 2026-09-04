@@ -16,9 +16,11 @@ release version.
 1. Ruff static analysis on Python 3.12 and Ubuntu.
 2. The complete non-HIL pytest suite on Python 3.11 and 3.12, on both Ubuntu
    and Windows.
-3. Wheel and source-distribution builds after quality and tests pass.
-4. Distribution metadata validation and an installed-wheel CLI smoke test.
-5. Upload of the built distributions as a 14-day workflow artifact.
+3. One dedicated Ubuntu/Chromium job that renders the shipping-label template
+   end to end, including QR and barcode generation.
+4. Wheel and source-distribution builds after quality and tests pass.
+5. Distribution metadata validation and an installed-wheel CLI smoke test.
+6. Upload of the built distributions as a 14-day workflow artifact.
 
 The `hil` marker is explicitly excluded in every automated test invocation.
 Physical-printer scenarios remain local, attended, and separately consented as
@@ -31,17 +33,18 @@ described in [the test-rig documentation](testing.md).
 matches `v` followed by `project.version` in `pyproject.toml`, then repeats
 Ruff, the non-HIL test suite, package construction, and metadata checks.
 
-After all checks pass, the workflow creates a GitHub Release with generated
-release notes and attaches both the wheel and source distribution. It uses the
-repository-scoped `GITHUB_TOKEN`; no external package-registry credential is
-required or configured.
+The release workflow also installs isolated Chromium and repeats the real HTML
+render before building. After all checks pass, it creates a GitHub Release with
+generated release notes and attaches both the wheel and source distribution.
+It uses the repository-scoped `GITHUB_TOKEN`; no external package-registry
+credential is required or configured.
 
-To release version `0.2.0` after its version change has passed CI and reached
+To release version `0.3.0` after its version change has passed CI and reached
 `master`:
 
 ```powershell
-git tag -a v0.2.0 -m "Release v0.2.0"
-git push origin v0.2.0
+git tag -a v0.3.0 -m "Release v0.3.0"
+git push origin v0.3.0
 ```
 
 Do not move or reuse a published release tag. If the package version and tag

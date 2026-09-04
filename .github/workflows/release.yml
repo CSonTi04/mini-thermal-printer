@@ -31,7 +31,7 @@ jobs:
 
       - name: Install the project and release tools
         run: >-
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,html]"
           "build>=1.3,<2"
           "twine>=6,<8"
 
@@ -43,6 +43,16 @@ jobs:
 
       - name: Run the hardware-free test rig
         run: python -m pytest -m "not hil"
+
+      - name: Install isolated Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Render a complete template through Chromium
+        run: >-
+          tronic-printer prepare-html
+          examples/shipping-label/shipping-label.html
+          --data examples/shipping-label/data.json
+          --output html-smoke.png
 
       - name: Build wheel and source distribution
         run: python -m build

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import tronic_printer
 from scripts import check_release_tag
 from scripts.check_release_tag import read_project_version, validate_tag
 
@@ -11,6 +12,14 @@ def test_project_version_is_read(tmp_path: Path) -> None:
     pyproject_path.write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
 
     assert read_project_version(pyproject_path) == "1.2.3"
+
+
+def test_runtime_version_matches_project_version() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+
+    assert tronic_printer.__version__ == read_project_version(
+        repository_root / "pyproject.toml"
+    )
 
 
 def test_matching_release_tag_is_accepted() -> None:

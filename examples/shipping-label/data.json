@@ -1,0 +1,27 @@
+{
+  "sender": {
+    "name": "Tiny Corner Shop",
+    "address": "12 Paper Street",
+    "postal_code": "1011",
+    "city": "Budapest",
+    "country": "HU"
+  },
+  "recipient": {
+    "name": "Alex Morgan",
+    "address": "48 Example Lane",
+    "address_2": "Apartment 3",
+    "postal_code": "1051",
+    "city": "Budapest",
+    "country": "HU"
+  },
+  "shipment": {
+    "reference": "ORDER-0042",
+    "service": "PRIORITY",
+    "weight": "0.42 kg",
+    "pieces": 1,
+    "tracking_number": "PKG-2026-0042",
+    "tracking_url": "https://example.test/track/PKG-2026-0042",
+    "fragile": true,
+    "notes": "Keep dry. Leave with reception if unavailable."
+  }
+}

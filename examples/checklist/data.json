@@ -1,0 +1,24 @@
+{
+  "title": "Workshop shutdown",
+  "date": "2026-08-31",
+  "owner": "Alex",
+  "sections": [
+    {
+      "title": "Equipment",
+      "tasks": [
+        {"label": "Power down soldering station", "done": true, "priority": false},
+        {"label": "Disconnect battery charger", "done": false, "priority": true},
+        {"label": "Return tools to the cabinet", "done": false, "priority": false}
+      ]
+    },
+    {
+      "title": "Before leaving",
+      "tasks": [
+        {"label": "Close windows", "done": false, "priority": false},
+        {"label": "Lock storage room", "done": false, "priority": true},
+        {"label": "Turn off the lights", "done": false, "priority": false}
+      ]
+    }
+  ],
+  "footer": "Initial the completed paper copy"
+}

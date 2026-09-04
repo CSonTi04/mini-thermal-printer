@@ -1,6 +1,6 @@
 # Progress and approval log
 
-Last updated: 2026-07-25
+Last updated: 2026-09-04
 
 ## Project decisions
 
@@ -231,19 +231,42 @@ is not relicensed under Apache License 2.0.
 - Added Unicode, font discovery, layout, validation, preview, consent-gate, and
   mocked BLE print coverage.
 
+### HTML templating and gallery validation
+
+- Added sandboxed Jinja HTML templates captured at one CSS pixel per printer
+  dot through an installed Chromium-family browser.
+- Added reusable layout classes, JSON data and overrides, confined local
+  assets, per-picture dithering, and local QR/Code 128 generation.
+- Added nine example templates: receipt, shipping label, postcard address,
+  parcel drop-in form, checklist, kitchen ticket, inventory label, event
+  ticket, and photo note.
+- Bundled the gallery in wheel and source distributions and added lightweight
+  `templates` and `copy-template` commands for installed users.
+- Added a dedicated Ubuntu/Chromium CI smoke job that renders a complete
+  machine-code template without adding Playwright to the full test matrix.
+- Paired the printer through Windows and obtained the outgoing classic SPP
+  endpoint on `COM6`.
+- Printed every gallery example through `print-html`; all nine jobs returned
+  completion `AA 0D 0A`, and the operator confirmed perfect physical output.
+- A same-day BLE retest with Bleak 1.1.1 discovered the printer but failed to
+  create a Windows GATT handle. Bluetooth LE Explorer still connected, and the
+  classic SPP path remained fully functional.
+
 ## Current checkpoint
 
-The official app's classic SPP print sequence and the Python driver's PC BLE
-query path and feed workaround are verified. Windows has not created a classic
-SPP COM port, but BLE provides a working PC transport. `codeESC` is recovered,
-reproduced byte-for-byte, and verified through a complete physical multi-row
-print. The Windows BLE driver path and practical image-printing CLI are now
-functional. Debian-family packaging and mocked behavior are validated in WSL;
-the image pipeline is ready for preview experimentation, and live Linux BLE is
-intentionally deferred to the Raspberry Pi stage.
+The official app's classic SPP sequence, recovered `codeESC` codec, image and
+text pipelines, and HTML template renderer are implemented and physically
+verified. Windows now exposes the paired printer through outgoing SPP port
+`COM6`; all nine gallery templates printed successfully through that path.
+The earlier Windows BLE validation remains documented, but direct BLE
+connection currently fails on this host with Bleak 1.1.1 despite successful
+discovery and a working Bluetooth LE Explorer connection. Debian-family
+packaging and mocked behavior are validated in WSL; native Linux BLE remains
+deferred to the Raspberry Pi stage.
 
 Remaining unknowns:
 
+- the current Windows/Bleak direct-GATT connection regression;
 - live BLE behavior on a native Debian/BlueZ host;
 - maximum reliable compressed image height beyond the verified 538-row lower
   bound and the need for long-image segmentation;

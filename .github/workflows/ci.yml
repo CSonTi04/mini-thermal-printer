@@ -73,11 +73,41 @@ jobs:
       - name: Run the hardware-free test rig
         run: python -m pytest -m "not hil"
 
+  html-smoke:
+    name: Browser HTML smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install HTML support
+        run: python -m pip install -e ".[html]"
+
+      - name: Install isolated Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Render a complete template through Chromium
+        run: >-
+          tronic-printer prepare-html
+          examples/shipping-label/shipping-label.html
+          --data examples/shipping-label/data.json
+          --output html-smoke.png
+
   package:
     name: Build distribution
     needs:
       - quality
       - tests
+      - html-smoke
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -107,6 +137,10 @@ jobs:
           python -m venv .package-smoke
           .package-smoke/bin/python -m pip install dist/*.whl
           .package-smoke/bin/tronic-printer --help
+          .package-smoke/bin/tronic-printer templates
+          .package-smoke/bin/tronic-printer copy-template receipt template-smoke
+          test -f template-smoke/receipt.html
+          test -f template-smoke/data.json
 
       - name: Upload distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

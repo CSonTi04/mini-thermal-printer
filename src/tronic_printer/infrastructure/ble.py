@@ -1,4 +1,4 @@
-"""Read-only BLE discovery helpers; no printer writes are implemented here."""
+"""BLE discovery and the credit-aware GATT printer transport."""
 
 from __future__ import annotations
 

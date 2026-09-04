@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 14px; --font-size: 15px; }
+      .ticket { border-block: 3px solid black; }
+      .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+      h1 { margin: 2px 0; font-size: 27px; line-height: 1.1; }
+      .ticket-type { border: 3px solid black; font-size: 18px; font-weight: 900; }
+      .attendee { font-size: 21px; font-weight: 700; }
+      .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .details strong { display: block; font-size: 17px; }
+      .tear { padding-top: 8px; border-top: 2px dashed black; }
+      .admit { font-size: 19px; font-weight: 900; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column ticket">
+      <header class="text-center no-break">
+        <div class="eyebrow">Admission ticket</div>
+        <h1>{{ event.name }}</h1>
+        <div>{{ event.venue }}</div>
+      </header>
+      <div class="ticket-type text-center p-2">{{ ticket.type }}</div>
+      <section class="no-break">
+        <div class="eyebrow">Attendee</div>
+        <div class="attendee">{{ attendee.name }}</div>
+      </section>
+      <div class="details no-break">
+        <div><span class="eyebrow">Date</span><strong>{{ event.date }}</strong></div>
+        <div><span class="eyebrow">Time</span><strong>{{ event.time }}</strong></div>
+        <div><span class="eyebrow">Door</span><strong>{{ ticket.door }}</strong></div>
+        <div><span class="eyebrow">Seat</span><strong>{{ ticket.seat }}</strong></div>
+      </div>
+      <img class="machine-code qr-code" src="{{ qr_code(ticket.validation_code, scale=3, error='q') }}" alt="Validation QR code">
+      <div class="text-center">{{ ticket.code }}</div>
+      <footer class="tear text-center">
+        <div class="admit">ADMIT {{ ticket.admit }}</div>
+        <div>{{ event.terms }}</div>
+      </footer>
+    </main>
+  </body>
+</html>

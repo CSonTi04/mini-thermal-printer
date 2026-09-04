@@ -38,6 +38,7 @@ from tronic_printer.preprocessing import (
     load_prepared_image,
 )
 from tronic_printer.showcase import load_showcase_pages
+from tronic_printer.template_gallery import copy_template, describe_templates
 from tronic_printer.text import (
     FontCatalog,
     FontSpec,
@@ -293,6 +294,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("ports", help="list operating-system serial ports")
     subparsers.add_parser("image-effects", help="list built-in and installed image effects")
+    subparsers.add_parser("templates", help="list bundled HTML template examples")
+
+    copy_template_parser = subparsers.add_parser(
+        "copy-template",
+        help="copy a bundled HTML template into an editable directory",
+    )
+    copy_template_parser.add_argument("name", help="template name shown by 'templates'")
+    copy_template_parser.add_argument("destination", help="new directory for the copied files")
 
     fonts = subparsers.add_parser("fonts", help="list discoverable system font faces")
     fonts.add_argument("--family", help="filter by family name")
@@ -431,6 +440,19 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(build_effect_registry().describe())
         except (ImportError, TypeError, ValueError) as error:
             raise SystemExit(f"cannot load image effects: {error}") from error
+        return 0
+    if args.action == "templates":
+        try:
+            _print_json(describe_templates())
+        except OSError as error:
+            raise SystemExit(f"cannot list templates: {error}") from error
+        return 0
+    if args.action == "copy-template":
+        try:
+            destination = copy_template(args.name, args.destination)
+        except (OSError, ValueError) as error:
+            raise SystemExit(f"cannot copy template: {error}") from error
+        _print_json({"name": args.name, "destination": str(destination)})
         return 0
     if args.action == "fonts":
         try:

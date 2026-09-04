@@ -4,6 +4,10 @@ The project has two deliberately separate test rigs. The default rig is fully
 mocked and never accesses Bluetooth. The hardware-in-the-loop (HIL) rig uses a
 paired printer through its operating-system serial port and is opt-in.
 
+On 2026-09-04, Windows pairing created an outgoing SPP channel on `COM6`, and
+all nine HTML gallery templates printed successfully through `print-html`.
+Each job returned `AA 0D 0A`; the printer remained ready after the batch.
+
 ## Mocked rig
 
 `EmulatedPrinterTransport` models the verified `A2Y` responses and maintains
@@ -58,6 +62,11 @@ The verified BLE equivalent takes the printer address instead of a COM port:
 .venv\Scripts\python.exe -m pytest tests\hil\test_live_ble_queries.py `
   --live --printer-address <printer-address> -v
 ```
+
+The BLE path was originally verified on this printer, but a 2026-09-04 retest
+with Bleak 1.1.1 could discover the advertisement while direct GATT connection
+failed on Windows. Bluetooth LE Explorer could still connect. Use the outgoing
+SPP port on Windows until this compatibility issue is resolved.
 
 The print test is more strongly gated because it activates the print head and
 moves paper. It will skip unless both consent flags are present:

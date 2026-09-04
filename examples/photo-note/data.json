@@ -1,0 +1,12 @@
+{
+  "date": "2026-08-31",
+  "title": "A little note",
+  "photo": "sample-landscape.svg",
+  "photo_prepared": null,
+  "photo_dither": "floyd-steinberg",
+  "photo_effects": ["autocontrast:cutoff=2"],
+  "caption": "Mountains, somewhere beyond the paper roll",
+  "message": "Thanks for helping with the tiny printer. Here is something small enough to keep in a pocket.",
+  "from": "Alex",
+  "signoff": "See you soon!"
+}

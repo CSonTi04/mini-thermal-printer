@@ -78,6 +78,17 @@ html, body {
   image-rendering: pixelated;
 }
 
+.machine-code {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+  image-rendering: pixelated;
+}
+
+.qr-code { width: auto; }
+.barcode { width: 100%; }
+
 .p-0 { padding: 0; }
 .p-1 { padding: var(--spacing-unit); }
 .p-2 { padding: calc(2 * var(--spacing-unit)); }
@@ -210,6 +221,111 @@ def _printer_image_helper(root: Path) -> Callable[..., str]:
     return printer_image
 
 
+def _qr_code_helper() -> Callable[..., str]:
+    def qr_code(
+        value: object,
+        *,
+        scale: int = 4,
+        border: int = 4,
+        error: str = "m",
+    ) -> str:
+        """Generate a black-and-white QR code as an embedded PNG."""
+
+        try:
+            import segno
+        except ImportError as import_error:
+            raise ImportError(
+                "QR generation requires Segno; install tronic-mini-printer[html]"
+            ) from import_error
+        text = str(value)
+        if not text:
+            raise ValueError("QR code value cannot be empty")
+        if not isinstance(scale, int) or not 1 <= scale <= 16:
+            raise ValueError("QR code scale must be an integer between 1 and 16")
+        if not isinstance(border, int) or not 0 <= border <= 16:
+            raise ValueError("QR code border must be an integer between 0 and 16")
+        error_level = error.lower()
+        if error_level not in {"l", "m", "q", "h"}:
+            raise ValueError("QR code error level must be l, m, q, or h")
+        code = segno.make_qr(text, error=error_level)
+        return code.png_data_uri(
+            scale=scale,
+            border=border,
+            dark="black",
+            light="white",
+        )
+
+    return qr_code
+
+
+def _barcode_helper() -> Callable[..., str]:
+    def barcode(
+        value: object,
+        *,
+        symbology: str = "code128",
+        module_width: float = 0.25,
+        module_height: float = 12.0,
+        quiet_zone: float = 2.0,
+        include_text: bool = True,
+    ) -> str:
+        """Generate a Code 128 or Code 39 barcode as an embedded SVG."""
+
+        try:
+            import barcode as barcode_library
+            from barcode.errors import BarcodeError
+            from barcode.writer import SVGWriter
+        except ImportError as import_error:
+            raise ImportError(
+                "barcode generation requires python-barcode; "
+                "install tronic-mini-printer[html]"
+            ) from import_error
+        text = str(value)
+        if not text:
+            raise ValueError("barcode value cannot be empty")
+        normalized_symbology = symbology.lower()
+        if normalized_symbology not in {"code128", "code39"}:
+            raise ValueError("barcode symbology must be code128 or code39")
+        dimensions = {
+            "module_width": module_width,
+            "module_height": module_height,
+            "quiet_zone": quiet_zone,
+        }
+        if any(not isinstance(value, (int, float)) for value in dimensions.values()):
+            raise ValueError("barcode dimensions must be numbers")
+        if not 0.1 <= module_width <= 1:
+            raise ValueError("barcode module_width must be between 0.1 and 1 mm")
+        if not 4 <= module_height <= 40:
+            raise ValueError("barcode module_height must be between 4 and 40 mm")
+        if not 0 <= quiet_zone <= 10:
+            raise ValueError("barcode quiet_zone must be between 0 and 10 mm")
+        output = io.BytesIO()
+        try:
+            code = barcode_library.get(
+                normalized_symbology,
+                text,
+                writer=SVGWriter(),
+            )
+            code.write(
+                output,
+                {
+                    **dimensions,
+                    "write_text": include_text,
+                    "font_size": 8,
+                    "text_distance": 1.5,
+                    "background": "white",
+                    "foreground": "black",
+                    "center_text": True,
+                    "with_doctype": False,
+                },
+            )
+        except (BarcodeError, ValueError) as error:
+            raise ValueError(f"cannot generate {normalized_symbology} barcode: {error}") from error
+        encoded = base64.b64encode(output.getvalue()).decode("ascii")
+        return f"data:image/svg+xml;base64,{encoded}"
+
+    return barcode
+
+
 def render_template(template_path: str | Path, data: Mapping[str, Any] | None = None) -> str:
     """Render one sandboxed Jinja template rooted at its own directory."""
 
@@ -250,6 +366,8 @@ def render_template(template_path: str | Path, data: Mapping[str, Any] | None = 
         enable_async=False,
     )
     environment.globals["printer_image"] = _printer_image_helper(root)
+    environment.globals["qr_code"] = _qr_code_helper()
+    environment.globals["barcode"] = _barcode_helper()
     try:
         return environment.get_template(source.name).render(dict(data or {}))
     except TemplateError as error:

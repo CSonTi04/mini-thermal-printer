@@ -39,7 +39,7 @@ The built-in stylesheet defines these variables:
 It also provides the following basic classes:
 
 - `.receipt` and `.receipt--padded`
-- `.full-width`, `.photo`, and `.no-break`
+- `.full-width`, `.photo`, `.machine-code`, `.qr-code`, `.barcode`, and `.no-break`
 - `.text-left`, `.text-center`, and `.text-right`
 - `.row`, `.column`, and `.space-between`
 - `.p-0` through `.p-4`, `.px-1`, `.px-2`, `.py-1`, and `.py-2`
@@ -49,8 +49,21 @@ Override the CSS variables in the template's own `<style>` block to establish a
 design system. All elements use `border-box` sizing. The standard padded content
 width is 352 dots: 384 minus 16 dots on each side.
 
-The [example receipt](../examples/receipt/receipt.html) demonstrates variables,
-loops, local SVG assets, flex rows, spacing, and an optional photograph.
+The [template gallery](../examples/README.md) includes a receipt, compact
+shipping label, international postcard address, parcel drop-in form, checklist,
+kitchen ticket, inventory label, event ticket, and photo note. Together they
+demonstrate loops, conditionals, local assets, machine-readable codes, flex and
+grid layout, spacing, and dithering.
+
+The gallery is included in both wheel and source distributions. Installed users
+can list its templates and copy one into a new editable directory:
+
+```powershell
+tronic-printer templates
+tronic-printer copy-template checklist my-checklist
+```
+
+The copy contains the HTML template, sample `data.json`, and any local assets.
 
 ## Data and automation
 
@@ -106,6 +119,40 @@ For mixed text and photographs, keep the final page in its default threshold
 mode and pre-dither each photograph with `printer_image`. For a page that is
 primarily artwork, a single final `--dither floyd-steinberg` pass is simpler.
 
+## QR codes and barcodes
+
+The optional HTML dependencies include pure-Python QR and barcode generators.
+Both helpers return local data URIs, so they do not relax the browser's network
+or filesystem restrictions.
+
+```html
+<img class="machine-code qr-code"
+     src="{{ qr_code(ticket_url, scale=4, border=4, error='q') }}">
+
+<img class="machine-code barcode"
+     src="{{ barcode(tracking_number,
+                     symbology='code128',
+                     module_width=0.25,
+                     module_height=12,
+                     quiet_zone=2,
+                     include_text=true) }}">
+```
+
+`qr_code` supports error levels `l`, `m`, `q`, and `h`, integer scale values
+from 1 through 16, and quiet-zone borders from 0 through 16 modules. It emits a
+pixel-aligned black-and-white PNG. `barcode` supports Code 128 and Code 39 and
+emits an SVG. Its dimensions are expressed in millimetres before the browser
+fits the SVG into the CSS layout.
+
+Keep a QR image at its generated intrinsic size; non-integer CSS resizing can
+turn square modules into uneven printer dots. Choose `scale` to control its
+size instead. The `.qr-code` class deliberately leaves width automatic.
+
+The helpers generate structurally valid symbols but cannot guarantee that a
+physical print will scan. Thermal density, paper, module size, CSS scaling, and
+the scanner all matter. Preserve the quiet zone and verify important codes on
+the target hardware.
+
 ## Printing
 
 Preview creation performs no hardware access. Printing keeps the existing two
@@ -120,6 +167,12 @@ consent gates and can save the exact raster before connecting:
 ```
 
 Both routes send the same `PrintRaster` command used by image and text printing.
+
+On 2026-09-04, all nine gallery templates were printed over the paired Windows
+classic Bluetooth SPP channel. Every job returned completion `AA 0D 0A`, and
+physical inspection confirmed complete, clean output. This validates the HTML
+capture, one-bit conversion, compressed raster, and serial transport path
+together. Machine-readable codes still require a separate scanner check.
 
 ## Security and reproducibility
 

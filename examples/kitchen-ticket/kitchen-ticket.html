@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 12px; --font-size: 16px; }
+      .order-number { margin: 0; font-size: 48px; line-height: 1; }
+      .order-type { border: 3px solid black; font-size: 21px; font-weight: 800; }
+      .meta { font-size: 14px; }
+      .rule { border-top: 3px solid black; }
+      .item { padding-block: 5px; border-bottom: 1px dashed black; }
+      .quantity { width: 34px; flex: 0 0 34px; font-size: 23px; font-weight: 800; }
+      .item-name { font-size: 19px; font-weight: 700; }
+      .modifier { margin-left: 38px; font-size: 14px; }
+      .alert { border: 4px solid black; font-size: 20px; font-weight: 900; }
+      .notes { border: 2px solid black; font-weight: 700; }
+      .status { font-size: 21px; font-weight: 900; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column">
+      <header class="text-center no-break">
+        <div class="meta">ORDER</div>
+        <h1 class="order-number">#{{ order.number }}</h1>
+        <div class="order-type p-1 mt-1">{{ order.type }}</div>
+      </header>
+      <div class="row space-between meta">
+        <span>{{ order.placed_at }}</span><span>{{ order.customer }}</span>
+      </div>
+      <div class="rule"></div>
+
+      {% for item in items %}
+        <section class="item no-break">
+          <div class="row">
+            <span class="quantity">{{ item.quantity }}×</span>
+            <span class="item-name">{{ item.name }}</span>
+          </div>
+          {% for modifier in item.modifiers %}<div class="modifier">• {{ modifier }}</div>{% endfor %}
+        </section>
+      {% endfor %}
+
+      {% if allergy %}<div class="alert text-center p-2">ALLERGY: {{ allergy | upper }}</div>{% endif %}
+      {% if notes %}<div class="notes p-2"><strong>NOTE:</strong> {{ notes }}</div>{% endif %}
+      <footer class="row space-between status mt-2">
+        <span>{% if paid %}PAID{% else %}PAYMENT DUE{% endif %}</span>
+        <span>{{ items | length }} ITEMS</span>
+      </footer>
+    </main>
+  </body>
+</html>

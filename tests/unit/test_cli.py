@@ -33,6 +33,25 @@ def test_image_effects_lists_builtin_plugins(capsys: pytest.CaptureFixture[str])
     assert {"autocontrast", "contrast", "edge", "gamma", "invert"} <= names
 
 
+def test_templates_lists_gallery_and_copies_editable_example(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    assert cli.main(["templates"]) == 0
+    names = {item["name"] for item in json.loads(capsys.readouterr().out)}
+    assert {"receipt", "shipping-label", "postcard-address", "parcel-drop-in"} <= names
+
+    destination = tmp_path / "my-checklist"
+    assert cli.main(["copy-template", "checklist", str(destination)]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output == {"destination": str(destination.resolve()), "name": "checklist"}
+    assert (destination / "checklist.html").is_file()
+    assert (destination / "data.json").is_file()
+
+    with pytest.raises(SystemExit, match="destination already exists"):
+        cli.main(["copy-template", "checklist", str(destination)])
+
+
 def test_prepare_image_writes_exact_preview_without_hardware(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

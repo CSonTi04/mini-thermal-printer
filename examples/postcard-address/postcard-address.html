@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 16px; --font-size: 18px; }
+      .address { padding: 6px 16px 10px; }
+      .address-line {
+        display: flex;
+        min-height: 42px;
+        align-items: flex-end;
+        padding: 0 6px 5px;
+        font-size: 21px;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+      .address-line--ruled { border-bottom: 2px solid black; }
+      .address-line:last-child {
+        justify-content: center;
+        padding-top: 7px;
+        font-size: 23px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded">
+      <section class="address no-break">
+        {% for line in address_lines %}
+        <div class="address-line{% if not loop.last %} address-line--ruled{% endif %}">{{ line }}</div>
+        {% endfor %}
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "event": {
+    "name": "Small Machines Night",
+    "venue": "Paper Street Workshop",
+    "date": "2026-09-12",
+    "time": "19:30",
+    "terms": "Valid for one entry. Keep this ticket dry."
+  },
+  "attendee": {"name": "Alex Morgan"},
+  "ticket": {
+    "type": "GENERAL ADMISSION",
+    "door": "B",
+    "seat": "Unreserved",
+    "admit": 1,
+    "code": "EVT-2026-0042",
+    "validation_code": "https://example.test/tickets/EVT-2026-0042"
+  }
+}

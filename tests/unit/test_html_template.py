@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,8 @@ from tronic_printer.html_template import (
     render_template,
 )
 from tronic_printer.preprocessing import DitherMode
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_template_values_accept_json_scalars_and_plain_strings() -> None:
@@ -71,6 +74,49 @@ def test_printer_image_embeds_one_bit_local_asset_and_rejects_escape(tmp_path: P
         render_template(template)
 
 
+def test_qr_and_barcode_helpers_embed_local_data_uris(tmp_path: Path) -> None:
+    template = tmp_path / "codes.html"
+    template.write_text(
+        "{{ qr_code('https://example.test/42', scale=2) }}\n"
+        "{{ barcode('PKG-0042', include_text=false) }}",
+        encoding="utf-8",
+    )
+
+    qr_uri, barcode_uri = render_template(template).splitlines()
+    qr_data = base64.b64decode(qr_uri.removeprefix("data:image/png;base64,"))
+    with Image.open(io.BytesIO(qr_data)) as qr:
+        assert qr.width == qr.height
+        assert set(qr.convert("L").tobytes()) <= {0, 255}
+
+    barcode_data = base64.b64decode(
+        barcode_uri.removeprefix("data:image/svg+xml;base64,")
+    )
+    assert b"<svg" in barcode_data
+    assert b"DOCTYPE" not in barcode_data
+    assert b"PKG-0042" not in barcode_data
+
+
+@pytest.mark.parametrize(
+    "expression, message",
+    [
+        ("qr_code('', scale=4)", "cannot be empty"),
+        ("qr_code('value', scale=0)", "scale"),
+        ("barcode('', include_text=false)", "cannot be empty"),
+        ("barcode('42', symbology='ean13')", "symbology"),
+    ],
+)
+def test_machine_code_helpers_validate_options(
+    expression: str,
+    message: str,
+    tmp_path: Path,
+) -> None:
+    template = tmp_path / "invalid.html"
+    template.write_text("{{ " + expression + " }}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        render_template(template)
+
+
 def test_browser_policy_allows_only_document_and_template_assets(tmp_path: Path) -> None:
     root = (tmp_path / "assets").resolve()
     root.mkdir()
@@ -92,6 +138,9 @@ def test_builtin_document_css_defines_384_dot_contract(tmp_path: Path) -> None:
     assert "--printer-width: 384px" in document
     assert ".receipt--padded" in document
     assert ".photo" in document
+    assert ".machine-code" in document
+    assert ".qr-code" in document
+    assert ".barcode" in document
     assert ".no-break" in document
 
 
@@ -123,3 +172,57 @@ def test_prepare_html_uses_browser_capture_then_shared_dithering(
     assert prepared.raster.height == 2
     assert prepared.prepared.black_pixels == 384
     assert set(prepared.prepared.preview.tobytes()) <= {0, 255}
+
+
+@pytest.mark.parametrize(
+    "demo, template_name",
+    [
+        ("receipt", "receipt.html"),
+        ("shipping-label", "shipping-label.html"),
+        ("postcard-address", "postcard-address.html"),
+        ("parcel-drop-in", "parcel-drop-in.html"),
+        ("checklist", "checklist.html"),
+        ("kitchen-ticket", "kitchen-ticket.html"),
+        ("inventory-label", "inventory-label.html"),
+        ("event-ticket", "event-ticket.html"),
+        ("photo-note", "photo-note.html"),
+    ],
+)
+def test_every_example_template_renders_from_sample_data(
+    demo: str,
+    template_name: str,
+) -> None:
+    example = REPOSITORY_ROOT / "examples" / demo
+    data = json.loads((example / "data.json").read_text(encoding="utf-8"))
+
+    rendered = render_template(example / template_name, data)
+
+    assert 'class="receipt ' in rendered
+    assert "{{" not in rendered
+    assert "{%" not in rendered
+
+
+def test_postcard_example_has_four_parts_and_three_rules() -> None:
+    example = REPOSITORY_ROOT / "examples" / "postcard-address"
+    data = json.loads((example / "data.json").read_text(encoding="utf-8"))
+
+    rendered = render_template(example / "postcard-address.html", data)
+
+    assert len(data["address_lines"]) == 4
+    assert rendered.count('class="address-line address-line--ruled"') == 3
+    assert rendered.count('class="address-line"') == 1
+    assert "Return address" not in rendered
+    assert "AIR MAIL" not in rendered
+
+
+def test_parcel_drop_in_example_has_no_banner_or_barcode() -> None:
+    example = REPOSITORY_ROOT / "examples" / "parcel-drop-in"
+    data = json.loads((example / "data.json").read_text(encoding="utf-8"))
+
+    rendered = render_template(example / "parcel-drop-in.html", data)
+
+    assert "PARCEL DROP-IN" not in rendered
+    assert "Simple shipping form" not in rendered
+    assert "data:image/svg+xml" not in rendered
+    assert "<img" not in rendered
+    assert data["tracking_number"] in rendered

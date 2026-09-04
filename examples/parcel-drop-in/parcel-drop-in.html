@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --page-padding: 14px; --font-size: 15px; }
+      .section { padding: 9px 0; border-bottom: 2px solid black; }
+      .section:first-child { padding-top: 2px; }
+      .section-title { margin-bottom: 4px; font-size: 12px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+      .name { font-size: 20px; font-weight: 800; }
+      .contact { display: grid; grid-template-columns: 52px 1fr; gap: 3px 7px; }
+      .field { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+      .value { min-width: 0; overflow-wrap: anywhere; }
+      .tracking { padding-top: 10px; }
+      .tracking-number { font-size: 20px; font-weight: 900; letter-spacing: 1px; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <main class="receipt receipt--padded column">
+      <section class="section no-break">
+        <div class="section-title">Sender</div>
+        <div class="name">{{ sender.name }}</div>
+        <div class="contact">
+          <span class="field">Phone</span><span class="value">{{ sender.phone }}</span>
+          <span class="field">Email</span><span class="value">{{ sender.email }}</span>
+        </div>
+      </section>
+
+      <section class="section no-break">
+        <div class="section-title">Receiver</div>
+        <div class="name">{{ receiver.name }}</div>
+        <div class="contact">
+          <span class="field">Phone</span><span class="value">{{ receiver.phone }}</span>
+          <span class="field">Email</span><span class="value">{{ receiver.email }}</span>
+        </div>
+      </section>
+
+      <section class="tracking no-break">
+        <div class="section-title">Tracking number</div>
+        <div class="tracking-number">{{ tracking_number }}</div>
+      </section>
+    </main>
+  </body>
+</html>
