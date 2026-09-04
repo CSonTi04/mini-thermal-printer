@@ -4,10 +4,16 @@ from tronic_printer.application import CommandBus, QueryBus, build_application
 from tronic_printer.domain import PrinterNotReady, RasterImage
 from tronic_printer.messages import (
     FeedPaper,
+    GetBootInfo,
     GetDeviceInfo,
+    GetSerialNumber,
+    GetShutdownTime,
+    GetSpeed,
+    GetTimeFormat,
     PrintRaster,
     RasterEncoding,
     SetDensity,
+    SetShutdownTime,
 )
 from tronic_printer.testing import EmulatedPrinterTransport
 
@@ -32,6 +38,36 @@ def test_set_density_changes_emulated_device_state() -> None:
     app.commands.execute(SetDensity(2))
 
     assert transport.density == 2
+
+
+def test_extended_info_uses_only_optional_read_queries() -> None:
+    transport = EmulatedPrinterTransport()
+    app = build_application(transport)
+
+    assert app.queries.ask(GetSerialNumber()) == "TEST-SERIAL"
+    assert app.queries.ask(GetBootInfo()) == "TEST-BOOT"
+    assert app.queries.ask(GetShutdownTime()) == 30
+    assert app.queries.ask(GetSpeed()) == 2
+    assert app.queries.ask(GetTimeFormat()) == 0
+    assert transport.exchanges == [
+        bytes.fromhex("10 FF 20 F2"),
+        bytes.fromhex("10 FF 20 EF"),
+        bytes.fromhex("10 FF 13"),
+        bytes.fromhex("10 FF 20 A0"),
+        bytes.fromhex("10 FF B0"),
+    ]
+    assert transport.writes == []
+
+
+def test_shutdown_time_can_be_changed_and_restored() -> None:
+    transport = EmulatedPrinterTransport(shutdown_time=20)
+    app = build_application(transport)
+
+    app.commands.execute(SetShutdownTime(30))
+    assert transport.shutdown_time == 30
+
+    app.commands.execute(SetShutdownTime(20))
+    assert transport.shutdown_time == 20
 
 
 def test_print_command_builds_complete_continuous_roll_job() -> None:

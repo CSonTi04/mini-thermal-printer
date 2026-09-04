@@ -9,9 +9,13 @@ from tronic_printer.domain import ProtocolError, RasterImage
 QUERY_MODEL = bytes.fromhex("10 FF 20 F0")
 QUERY_FIRMWARE = bytes.fromhex("10 FF 20 F1")
 QUERY_SERIAL = bytes.fromhex("10 FF 20 F2")
+QUERY_BOOT_INFO = bytes.fromhex("10 FF 20 EF")
 QUERY_BATTERY = bytes.fromhex("10 FF 50 F1")
 QUERY_DENSITY = bytes.fromhex("10 FF 11")
 QUERY_STATUS = bytes.fromhex("10 FF 40")
+QUERY_SHUTDOWN_TIME = bytes.fromhex("10 FF 13")
+QUERY_SPEED = bytes.fromhex("10 FF 20 A0")
+QUERY_TIME_FORMAT = bytes.fromhex("10 FF B0")
 
 START_JOB = bytes.fromhex("10 FF F1 03")
 WAKE_PREFIX = bytes(12)
@@ -52,10 +56,37 @@ def decode_status(response: bytes) -> int:
     return response[0]
 
 
+def decode_shutdown_time(response: bytes) -> int:
+    """Decode the SDK's one- or two-byte shutdown-time response."""
+    if not response:
+        raise ProtocolError("empty shutdown-time response")
+    return response[1] if len(response) == 2 else response[0]
+
+
+def decode_speed(response: bytes) -> int:
+    if not response:
+        raise ProtocolError("empty speed response")
+    return response[0]
+
+
+def decode_time_format(response: bytes) -> int:
+    if len(response) != 1:
+        raise ProtocolError(
+            f"time-format response must contain exactly one byte: {response.hex(' ')}"
+        )
+    return response[0]
+
+
 def set_density(level: int) -> bytes:
     if level not in range(3):
         raise ValueError("density must be 0, 1, or 2")
     return bytes((0x10, 0xFF, 0x10, 0x00, level))
+
+
+def set_shutdown_time(minutes: int) -> bytes:
+    if minutes not in {5, 10, 20, 30, 60}:
+        raise ValueError("shutdown time must be 5, 10, 20, 30, or 60 minutes")
+    return bytes((0x10, 0xFF, 0x12)) + minutes.to_bytes(2, "big")
 
 
 def start_job(mode: int = 3) -> bytes:

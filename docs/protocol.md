@@ -60,7 +60,9 @@ A Windows live session on 2026-07-25 verified this service layout and used it
 successfully for model, firmware, battery, density, and status queries. The
 printer requested a 100-byte packet payload through FF03, but Windows exposed
 a 20-byte write-without-response maximum, so the driver safely uses 20-byte
-packets. Printing over BLE has not yet been attempted.
+packets. Compressed printing was subsequently verified over BLE through 538
+raster rows. A later Windows/Bleak 1.1.1 regression currently prevents a new
+direct-GATT connection on this host; classic SPP remains operational.
 
 The bundled SDK also implements the following BLE transport:
 
@@ -173,7 +175,7 @@ Multi-byte values are described in the byte order recovered from the app.
 | Query serial number | `10 FF 20 F2` | response decoded as a string |
 | Query boot info | `10 FF 20 EF` | response decoded as a string |
 | Set print width | `10 FF 15 width_lo width_hi` | None required |
-| Query shutdown time | `10 FF 13` | first response byte |
+| Query shutdown time | `10 FF 13` | byte 1 for a two-byte reply; otherwise byte 0 |
 | Set shutdown time | `10 FF 12 value_hi value_lo` | success/failure callback |
 | Query speed | `10 FF 20 A0` | first response byte |
 | Set speed | `10 FF C0 speed` | success/failure callback |
@@ -188,6 +190,8 @@ Multi-byte values are described in the byte order recovered from the app.
 | Mark not-last page | `1B BB AA` | None required |
 
 The seven time bytes are `year_hi year_lo month day hour minute second`.
+The optional read-only query tier and safety gates for later setting tests are
+tracked in [the protocol experiment plan](protocol-experiments.md).
 
 ### Status byte
 

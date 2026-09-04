@@ -260,6 +260,64 @@ def test_info_uses_cqrs_application(
     assert output["status"]["raw"] == 0
 
 
+def test_probe_info_is_live_gated_and_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["probe-info", "--port", "COM7"])
+    assert printer.exchanges == []
+
+    assert cli.main(["probe-info", "--port", "COM7", "--live"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["boot_info"] == {"supported": True, "value": "TEST-BOOT"}
+    assert output["serial_number"] == {"supported": True, "value": "TEST-SERIAL"}
+    assert output["shutdown_minutes"] == {"supported": True, "value": 30}
+    assert output["speed"] == {"supported": True, "value": 2}
+    assert output["time_format"] == {"supported": True, "value": 0}
+    assert printer.writes == []
+
+
+def test_ble_probe_info_is_live_gated_and_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedPrinterTransport()
+    printer.connection_info = {"packet_size": 20}  # type: ignore[attr-defined]
+    monkeypatch.setattr(cli, "BleTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["ble-probe-info", "mock"])
+    assert printer.exchanges == []
+
+    assert cli.main(["ble-probe-info", "mock", "--live"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["boot_info"] == {"supported": True, "value": "TEST-BOOT"}
+    assert output["ble"]["packet_size"] == 20
+    assert printer.writes == []
+
+
+@pytest.mark.parametrize("error", [TimeoutError("no response"), OSError("write rejected")])
+def test_optional_probe_continues_after_unsupported_query(error: OSError) -> None:
+    printer = EmulatedPrinterTransport()
+    original_exchange = printer.exchange
+
+    def exchange(payload: bytes, **options: object) -> bytes:
+        if payload == bytes.fromhex("10 FF 20 A0"):
+            raise error
+        return original_exchange(payload, **options)
+
+    printer.exchange = exchange  # type: ignore[method-assign]
+
+    result = cli._probe_optional_info(cli.build_application(printer))
+
+    assert result["speed"] == {"supported": False, "error": str(error)}
+    assert result["time_format"] == {"supported": True, "value": 0}
+
+
 def test_print_requires_separate_consent(monkeypatch: pytest.MonkeyPatch) -> None:
     printer = EmulatedPrinterTransport()
     monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)

@@ -1,5 +1,5 @@
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -38,6 +38,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--live", action="store_true", help="allow access to a physical printer")
     group.addoption("--allow-printing", action="store_true", help="allow paper/head activation")
     group.addoption(
+        "--allow-settings",
+        action="store_true",
+        help="allow a reversible physical-printer setting experiment",
+    )
+    group.addoption(
         "--allow-four-image-showcase",
         action="store_true",
         help="allow the long four-page labeled image showcase",
@@ -71,9 +76,30 @@ def hil_transport(request: pytest.FixtureRequest) -> Iterator[SerialTransport]:
 
 
 @pytest.fixture
+def hil_transport_factory(request: pytest.FixtureRequest) -> Callable[[], SerialTransport]:
+    if not request.config.getoption("--live"):
+        pytest.skip("requires explicit --live consent")
+    port = request.config.getoption("--printer-port")
+    if not port:
+        pytest.skip("requires --printer-port")
+    baudrate = request.config.getoption("--printer-baudrate")
+
+    def create_transport() -> SerialTransport:
+        return SerialTransport(port, baudrate=baudrate)
+
+    return create_transport
+
+
+@pytest.fixture
 def printing_allowed(request: pytest.FixtureRequest) -> None:
     if not request.config.getoption("--allow-printing"):
         pytest.skip("requires separate --allow-printing consent")
+
+
+@pytest.fixture
+def settings_allowed(request: pytest.FixtureRequest) -> None:
+    if not request.config.getoption("--allow-settings"):
+        pytest.skip("requires separate --allow-settings consent")
 
 
 @pytest.fixture

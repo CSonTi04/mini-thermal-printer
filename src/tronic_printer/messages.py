@@ -34,6 +34,31 @@ class GetStatus:
 
 
 @dataclass(frozen=True, slots=True)
+class GetSerialNumber:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class GetBootInfo:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class GetShutdownTime:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class GetSpeed:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class GetTimeFormat:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class GetDeviceInfo:
     pass
 
@@ -41,6 +66,11 @@ class GetDeviceInfo:
 @dataclass(frozen=True, slots=True)
 class SetDensity:
     level: int
+
+
+@dataclass(frozen=True, slots=True)
+class SetShutdownTime:
+    minutes: int
 
 
 @dataclass(frozen=True, slots=True)

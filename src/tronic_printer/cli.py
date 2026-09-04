@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import NoReturn
 
 from tronic_printer import protocol
-from tronic_printer.application import build_application
-from tronic_printer.domain import RasterImage
+from tronic_printer.application import PrinterApplication, build_application
+from tronic_printer.domain import ProtocolError, RasterImage
 from tronic_printer.html_template import (
     HtmlTemplateConfig,
     PreparedHtml,
@@ -24,7 +24,12 @@ from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_ga
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
 from tronic_printer.messages import (
     FeedPaper,
+    GetBootInfo,
     GetDeviceInfo,
+    GetSerialNumber,
+    GetShutdownTime,
+    GetSpeed,
+    GetTimeFormat,
     PrintRaster,
     PrintResult,
     RasterEncoding,
@@ -56,11 +61,31 @@ def _require(flag: bool, message: str) -> None:
 
 def _serial_transport(args: argparse.Namespace) -> SerialTransport:
     _require(args.live, "refusing hardware access without --live")
-    return SerialTransport(args.port, baudrate=args.baudrate)
+    try:
+        return SerialTransport(args.port, baudrate=args.baudrate)
+    except OSError as error:
+        raise SystemExit(f"cannot open serial printer: {error}") from error
 
 
 def _print_json(value: object) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def _probe_optional_info(app: PrinterApplication) -> dict[str, dict[str, object]]:
+    probes = (
+        ("serial_number", GetSerialNumber()),
+        ("boot_info", GetBootInfo()),
+        ("shutdown_minutes", GetShutdownTime()),
+        ("speed", GetSpeed()),
+        ("time_format", GetTimeFormat()),
+    )
+    results: dict[str, dict[str, object]] = {}
+    for name, query in probes:
+        try:
+            results[name] = {"supported": True, "value": app.queries.ask(query)}
+        except (OSError, ProtocolError, TimeoutError) as error:
+            results[name] = {"supported": False, "error": str(error)}
+    return results
 
 
 def _add_print_options(parser: argparse.ArgumentParser) -> None:
@@ -348,6 +373,15 @@ def build_parser() -> argparse.ArgumentParser:
     ble_info.add_argument("address")
     ble_info.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
 
+    ble_probe_info = subparsers.add_parser(
+        "ble-probe-info",
+        help="run optional read-only protocol queries over BLE",
+    )
+    ble_probe_info.add_argument("address")
+    ble_probe_info.add_argument(
+        "--live", action="store_true", help="confirm physical Bluetooth access"
+    )
+
     ble_print = subparsers.add_parser("ble-print-test", help="print a test pattern over BLE")
     ble_print.add_argument("address")
     ble_print.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
@@ -406,7 +440,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that moving paper is allowed",
     )
 
-    for name in ("info", "print-test", "print-image", "print-text", "print-html"):
+    for name in ("info", "probe-info", "print-test", "print-image", "print-text", "print-html"):
         command = subparsers.add_parser(name)
         command.add_argument("--port", required=True)
         command.add_argument("--baudrate", type=int, default=115_200)
@@ -527,6 +561,16 @@ def main(argv: list[str] | None = None) -> int:
                 result["ble"] = transport.connection_info
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE query failed: {error}") from error
+        _print_json(result)
+        return 0
+    if args.action == "ble-probe-info":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        try:
+            with BleTransport(args.address) as transport:
+                result = _probe_optional_info(build_application(transport))
+                result["ble"] = transport.connection_info
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE protocol probe failed: {error}") from error
         _print_json(result)
         return 0
     if args.action == "ble-print-test":
@@ -663,6 +707,9 @@ def main(argv: list[str] | None = None) -> int:
             result = asdict(info)
             result["status"] = asdict(info.status)
             _print_json(result)
+            return 0
+        if args.action == "probe-info":
+            _print_json(_probe_optional_info(app))
             return 0
         if args.action == "print-test":
             _require(args.allow_printing, "refusing to print without --allow-printing")

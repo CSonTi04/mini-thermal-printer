@@ -17,15 +17,21 @@ from tronic_printer.domain import (
 from tronic_printer.messages import (
     FeedPaper,
     GetBattery,
+    GetBootInfo,
     GetDensity,
     GetDeviceInfo,
     GetFirmware,
     GetModel,
+    GetSerialNumber,
+    GetShutdownTime,
+    GetSpeed,
     GetStatus,
+    GetTimeFormat,
     PrintRaster,
     PrintResult,
     RasterEncoding,
     SetDensity,
+    SetShutdownTime,
 )
 from tronic_printer.ports import PrinterTransport
 
@@ -90,6 +96,26 @@ class PrinterQueryHandlers:
         raw = protocol.decode_status(self.transport.exchange(protocol.QUERY_STATUS))
         return PrinterStatus.from_byte(raw)
 
+    def serial_number(self, _query: GetSerialNumber) -> str:
+        response = self.transport.exchange(protocol.QUERY_SERIAL)
+        return protocol.decode_ascii(response, "serial number")
+
+    def boot_info(self, _query: GetBootInfo) -> str:
+        response = self.transport.exchange(protocol.QUERY_BOOT_INFO)
+        return protocol.decode_ascii(response, "boot info")
+
+    def shutdown_time(self, _query: GetShutdownTime) -> int:
+        response = self.transport.exchange(protocol.QUERY_SHUTDOWN_TIME)
+        return protocol.decode_shutdown_time(response)
+
+    def speed(self, _query: GetSpeed) -> int:
+        response = self.transport.exchange(protocol.QUERY_SPEED, timeout=5.0)
+        return protocol.decode_speed(response)
+
+    def time_format(self, _query: GetTimeFormat) -> int:
+        response = self.transport.exchange(protocol.QUERY_TIME_FORMAT)
+        return protocol.decode_time_format(response)
+
     def device_info(self, _query: GetDeviceInfo) -> DeviceInfo:
         return DeviceInfo(
             model=self.model(GetModel()),
@@ -98,7 +124,6 @@ class PrinterQueryHandlers:
             density=self.density(GetDensity()),
             status=self.status(GetStatus()),
         )
-
 
 class PrinterCommandHandlers:
     def __init__(self, transport: PrinterTransport, queries: PrinterQueryHandlers) -> None:
@@ -109,6 +134,11 @@ class PrinterCommandHandlers:
         response = self.transport.exchange(protocol.set_density(command.level))
         if not protocol.is_success(response):
             raise ProtocolError(f"set-density rejected: {response.hex(' ')}")
+
+    def set_shutdown_time(self, command: SetShutdownTime) -> None:
+        response = self.transport.exchange(protocol.set_shutdown_time(command.minutes))
+        if not protocol.is_success(response):
+            raise ProtocolError(f"set-shutdown-time rejected: {response.hex(' ')}")
 
     def feed_paper(self, command: FeedPaper) -> None:
         # Firmware V1.06LY ignores feed outside a raster job and leaves a
@@ -167,7 +197,13 @@ def build_application(transport: PrinterTransport) -> PrinterApplication:
     query_bus.register(GetDensity, queries.density)
     query_bus.register(GetStatus, queries.status)
     query_bus.register(GetDeviceInfo, queries.device_info)
+    query_bus.register(GetSerialNumber, queries.serial_number)
+    query_bus.register(GetBootInfo, queries.boot_info)
+    query_bus.register(GetShutdownTime, queries.shutdown_time)
+    query_bus.register(GetSpeed, queries.speed)
+    query_bus.register(GetTimeFormat, queries.time_format)
     command_bus.register(SetDensity, commands.set_density)
+    command_bus.register(SetShutdownTime, commands.set_shutdown_time)
     command_bus.register(FeedPaper, commands.feed_paper)
     command_bus.register(PrintRaster, commands.print_raster)
     return PrinterApplication(queries=query_bus, commands=command_bus)

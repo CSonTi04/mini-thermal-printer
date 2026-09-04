@@ -252,6 +252,33 @@ is not relicensed under Apache License 2.0.
   create a Windows GATT handle. Bluetooth LE Explorer still connected, and the
   classic SPP path remained fully functional.
 
+### Optional protocol experiments
+
+- Added typed, read-only queries for serial number, boot information, shutdown
+  time, speed, and time format using the exact statically recovered frames.
+- Added separately live-gated `probe-info` and `ble-probe-info` commands,
+  emulator behavior, unit coverage, and SPP/BLE HIL cases. No setting-write
+  command was exposed.
+- Verified the hardware-free suite with 151 passing tests. The first COM6 live
+  attempt stopped while Windows opened the Bluetooth serial endpoint with OS
+  error 121, before any query bytes were transmitted; the standard `info`
+  command reproduced the same transport-level failure.
+- Retried after the printer was brought online. Serial number, boot information
+  `V3.02`, and the 20-minute shutdown setting responded; the generic speed and
+  time-format queries did not. Standard telemetry immediately afterward showed
+  clean status `00`, so the printer remained healthy. The serial number stays
+  outside tracked documentation.
+- Prepared a separately gated shutdown-time round trip using only official app
+  values: query 20 minutes, temporarily set 30, verify, restore 20 in a
+  `finally` block, and verify restoration.
+- Ran the approved shutdown experiment. The 30-minute write returned `OK` but
+  Windows dropped the reused SPP session before verification; a fresh session
+  read back 30. Separate fresh connections then restored and verified the
+  original 20-minute setting. The HIL procedure now isolates each operation in
+  its own connection; the revised scenario passed in 1.54 seconds and again
+  left the printer at 20 minutes. No paper moved and the print head was not
+  activated.
+
 ## Current checkpoint
 
 The official app's classic SPP sequence, recovered `codeESC` codec, image and

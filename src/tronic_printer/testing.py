@@ -48,12 +48,22 @@ class EmulatedPrinterTransport:
         battery: int = 92,
         density: int = 1,
         status: int = 0,
+        serial_number: str = "TEST-SERIAL",
+        boot_info: str = "TEST-BOOT",
+        shutdown_time: int = 30,
+        speed: int = 2,
+        time_format: int = 0,
     ) -> None:
         self.model = model
         self.firmware = firmware
         self.battery = battery
         self.density = density
         self.status = status
+        self.serial_number = serial_number
+        self.boot_info = boot_info
+        self.shutdown_time = shutdown_time
+        self.speed = speed
+        self.time_format = time_format
         self.writes: list[bytes] = []
         self.exchanges: list[bytes] = []
         self.completed_jobs: list[list[bytes]] = []
@@ -85,8 +95,21 @@ class EmulatedPrinterTransport:
             return bytes((self.density, 0x0C, 0x10))
         if request == protocol.QUERY_STATUS:
             return bytes((self.status,))
+        if request == protocol.QUERY_SERIAL:
+            return self.serial_number.encode("ascii")
+        if request == protocol.QUERY_BOOT_INFO:
+            return self.boot_info.encode("ascii")
+        if request == protocol.QUERY_SHUTDOWN_TIME:
+            return bytes((0, self.shutdown_time))
+        if request == protocol.QUERY_SPEED:
+            return bytes((self.speed,))
+        if request == protocol.QUERY_TIME_FORMAT:
+            return bytes((self.time_format,))
         if request.startswith(bytes.fromhex("10 FF 10 00")) and len(request) == 5:
             self.density = request[-1]
+            return b"OK"
+        if request.startswith(bytes.fromhex("10 FF 12")) and len(request) == 5:
+            self.shutdown_time = int.from_bytes(request[-2:], "big")
             return b"OK"
         if request == protocol.STOP_JOB:
             if self._active_job is None:
