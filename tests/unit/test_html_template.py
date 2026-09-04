@@ -136,7 +136,9 @@ def test_builtin_document_css_defines_384_dot_contract(tmp_path: Path) -> None:
     document = _as_document('<main class="receipt"></main>', tmp_path.resolve(), 384)
 
     assert "--printer-width: 384px" in document
+    assert "--paper-center-offset: 8px" in document
     assert ".receipt--padded" in document
+    assert ".receipt--paper-centered" in document
     assert ".photo" in document
     assert ".machine-code" in document
     assert ".qr-code" in document

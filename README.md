@@ -10,7 +10,8 @@ The target observed by this project is:
 - Bluetooth name: `Mini Pocket Printer_BLE`
 - Firmware shown by the official app: `V1.06LY`
 - Paper: approximately 56 mm wide
-- Print head: 384 dots, inferred as 48 mm printable width at 8 dots/mm
+- Print head: verified full-width 384 dots / approximately 48 mm at 8 dots/mm
+- Measured continuous-roll margins: approximately 3 mm left and 5 mm right
 - Host platforms: Windows and Debian/Linux
 
 ## Current status

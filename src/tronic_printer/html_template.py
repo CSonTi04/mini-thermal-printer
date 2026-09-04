@@ -31,6 +31,7 @@ PRINTER_CSS = """
 :root {
   --printer-width: 384px;
   --page-padding: 16px;
+  --paper-center-offset: 8px;
   --spacing-unit: 4px;
   --font-family: Arial, Helvetica, sans-serif;
   --font-size: 16px;
@@ -60,6 +61,10 @@ html, body {
 }
 
 .receipt--padded { padding: var(--page-padding); }
+.receipt--paper-centered {
+  padding-left: calc(var(--page-padding) + var(--paper-center-offset));
+  padding-right: calc(var(--page-padding) - var(--paper-center-offset));
+}
 .full-width { display: block; width: 100%; max-width: 100%; }
 .text-left { text-align: left; }
 .text-center { text-align: center; }

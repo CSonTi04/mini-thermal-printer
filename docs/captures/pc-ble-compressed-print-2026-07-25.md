@@ -36,10 +36,10 @@ The photograph shows:
 - the full 384-dot pattern within the paper's physical side margins; and
 - substantial blank paper between the lower border and the tear bar.
 
-The image appears centered within the approximately 56 mm roll. Since the
-verified printable width is 48 mm, the nominal unused paper width is about
-8 mm total. Exact left/right millimeter margins still require a flat physical
-measurement rather than estimation from a perspective photograph.
+The image appeared roughly centered within the approximately 56 mm roll. A
+later dedicated SPP calibration measured the full 48 mm border at approximately
+3 mm from the left paper edge and 5 mm from the right. See the
+[width-calibration capture](pc-spp-width-calibration-2026-09-04.md).
 
 ## Conclusion
 

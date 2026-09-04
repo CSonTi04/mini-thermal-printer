@@ -21,9 +21,10 @@ SDK commands not seen in that capture remain unverified.
 | Live model response | `A2Y` | Verified |
 | Live firmware response | `V1.06LY` | Verified |
 | Print width | 384 dots | Verified |
-| Dot density | 8 dots/mm, approximately 203 dpi | Recovered |
-| Printable width | 48 mm (`384 / 8`) | Inferred |
+| Dot density | 8 dots/mm, approximately 203 dpi | Recovered and physically consistent |
+| Printable width | approximately 48 mm (`384 / 8`) | Verified |
 | Physical roll | approximately 56 mm | Observed |
+| Continuous-roll margins | approximately 3 mm left / 5 mm right | Verified |
 | Density range | 0 through 2; app default 1 | Recovered |
 | Default trailing feed | 80 dots | Recovered |
 | Grayscale support | disabled by default | Recovered |

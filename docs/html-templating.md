@@ -33,12 +33,13 @@ The built-in stylesheet defines these variables:
 
 - `--printer-width: 384px`
 - `--page-padding: 16px`
+- `--paper-center-offset: 8px`
 - `--spacing-unit: 4px`
 - `--font-family` and `--font-size`
 
 It also provides the following basic classes:
 
-- `.receipt` and `.receipt--padded`
+- `.receipt`, `.receipt--padded`, and `.receipt--paper-centered`
 - `.full-width`, `.photo`, `.machine-code`, `.qr-code`, `.barcode`, and `.no-break`
 - `.text-left`, `.text-center`, and `.text-right`
 - `.row`, `.column`, and `.space-between`
@@ -48,6 +49,31 @@ It also provides the following basic classes:
 Override the CSS variables in the template's own `<style>` block to establish a
 design system. All elements use `border-box` sizing. The standard padded content
 width is 352 dots: 384 minus 16 dots on each side.
+
+## Physical paper alignment
+
+A full-width SPP calibration on the target A2Y printer verified all 384 dots,
+or approximately 48 mm at 8 dots/mm. On the approximately 56 mm continuous
+roll, the operator measured about 3 mm from the left paper edge to the printed
+border and 5 mm from the printed border to the right paper edge. The printable
+area is therefore approximately 1 mm, or 8 dots, left of the paper centre.
+
+The optional `.receipt--paper-centered` class compensates padded layouts by
+redistributing the default 16-dot side padding to 24 dots on the left and 8
+dots on the right. The content remains 352 dots wide but is physically centred
+on this printer and roll:
+
+```html
+<main class="receipt receipt--padded receipt--paper-centered">
+  ...
+</main>
+```
+
+Keep `--page-padding` at least as large as `--paper-center-offset` when using
+the class. Do not use it for full-bleed calibration or when physical alignment
+to the print head matters more than centring on the paper. Roll placement can
+vary, so treat the 3/5 mm margins as measured values rather than a universal
+guarantee for every device.
 
 The [template gallery](../examples/README.md) includes a receipt, compact
 shipping label, international postcard address, parcel drop-in form, checklist,

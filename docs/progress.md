@@ -279,6 +279,20 @@ is not relicensed under Apache License 2.0.
   left the printer at 20 minutes. No paper moved and the print head was not
   activated.
 
+### Physical print-area calibration
+
+- Printed a 384×96-dot compressed border/ruler strip over Windows SPP with a
+  160-dot trailing feed; the printer returned `AA 0D 0A`.
+- The operator measured an approximately 56 mm roll, 48 mm printed border,
+  3 mm left margin, and 5 mm right margin. The supplied photograph showed both
+  outer borders, centre lines, and ruler ticks complete and continuous.
+- Verified the full 384-dot head as reliably printable. The printable area is
+  approximately 1 mm / 8 dots left of the physical paper centre for this roll
+  loading.
+- Added an opt-in `.receipt--paper-centered` HTML class that redistributes the
+  default padding to 24 dots left and 8 dots right, preserving 352 dots of
+  content while centring it on the measured paper.
+
 ## Current checkpoint
 
 The official app's classic SPP sequence, recovered `codeESC` codec, image and
@@ -289,7 +303,9 @@ The earlier Windows BLE validation remains documented, but direct BLE
 connection currently fails on this host with Bleak 1.1.1 despite successful
 discovery and a working Bluetooth LE Explorer connection. Debian-family
 packaging and mocked behavior are validated in WSL; native Linux BLE remains
-deferred to the Raspberry Pi stage.
+deferred to the Raspberry Pi stage. The complete 384-dot / approximately 48 mm
+printable width is physically verified, with measured continuous-roll margins
+of approximately 3 mm left and 5 mm right.
 
 Remaining unknowns:
 
@@ -299,7 +315,6 @@ Remaining unknowns:
   bound and the need for long-image segmentation;
 - preferred physically calibrated preprocessing defaults for different media
   and artistic styles;
-- exact physical margins and maximum reliable printable width; and
 - behavior on indexed/label media rather than the current continuous roll.
 
 ## Agreed next phase: PC discovery and Python driver
