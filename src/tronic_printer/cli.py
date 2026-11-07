@@ -8,11 +8,18 @@ import json
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from tronic_printer import protocol
 from tronic_printer.application import PrinterApplication, build_application
 from tronic_printer.domain import ProtocolError, RasterImage
+from tronic_printer.halftone_qr import (
+    HalftoneDither,
+    HalftoneOptions,
+    MarksMode,
+    halftone_qr_to_raster,
+    render_halftone_qr,
+)
 from tronic_printer.html_template import (
     HtmlTemplateConfig,
     PreparedHtml,
@@ -313,6 +320,137 @@ def _prepared_html_print_result(result: PrintResult, prepared: PreparedHtml) -> 
     _print_json(values)
 
 
+def _add_halftone_qr_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--data", required=True, help="text or URL to encode in the QR code")
+    parser.add_argument(
+        "--image",
+        required=True,
+        help="background image (any Pillow-readable format)",
+    )
+    parser.add_argument(
+        "--grid",
+        type=int,
+        default=6,
+        metavar="N",
+        help="subpixels per module side (default 6; presets: 3,5,6)",
+    )
+    parser.add_argument(
+        "--core",
+        type=int,
+        default=2,
+        metavar="C",
+        help="solid core size within each module cell (default 2)",
+    )
+    parser.add_argument(
+        "--dither",
+        choices=[m.value for m in HalftoneDither],
+        default=HalftoneDither.FLOYD_STEINBERG.value,
+        help="dither algorithm for the background image (default floyd-steinberg)",
+    )
+    parser.add_argument(
+        "--error-level",
+        choices=["l", "m", "q", "h"],
+        default="h",
+        help="QR error correction level (default h)",
+    )
+    parser.add_argument(
+        "--marks",
+        choices=[m.value for m in MarksMode],
+        default=MarksMode.ALL.value,
+        help="structural modules rendered solid (default all)",
+    )
+    parser.add_argument(
+        "--contrast",
+        type=float,
+        default=1.0,
+        help="background image contrast factor (default 1.0)",
+    )
+    parser.add_argument(
+        "--brightness",
+        type=float,
+        default=1.0,
+        help="background image brightness factor (default 1.0)",
+    )
+    parser.add_argument(
+        "--invert",
+        action="store_true",
+        help="invert background image tones",
+    )
+    parser.add_argument(
+        "--border",
+        type=int,
+        default=4,
+        help="quiet zone width in modules (default 4)",
+    )
+    parser.add_argument(
+        "--mask",
+        type=int,
+        default=None,
+        metavar="0-7",
+        help="QR mask pattern 0-7, or omit for automatic selection",
+    )
+
+
+def _prepare_halftone_qr_or_exit(
+    args: argparse.Namespace,
+) -> tuple[Any, RasterImage, int]:
+    """Render halftone QR, scale for printer, return (preview_pil, raster, dps)."""
+    from PIL import Image as _Image
+
+    try:
+        options = HalftoneOptions(
+            grid=args.grid,
+            core=args.core,
+            dither=HalftoneDither(args.dither),
+            error_level=args.error_level,
+            marks=MarksMode(args.marks),
+            border=args.border,
+            mask=args.mask,
+            contrast=args.contrast,
+            brightness=args.brightness,
+            invert=args.invert,
+        )
+        with _Image.open(args.image) as img:
+            img.load()
+            rendered = render_halftone_qr(args.data, img, options)
+        scaled, dps = halftone_qr_to_raster(rendered, max_width=protocol.MAX_PRINT_WIDTH)
+    except (ImportError, OSError, TypeError, ValueError) as error:
+        raise SystemExit(f"cannot prepare halftone QR: {error}") from error
+
+    # Convert scaled PIL image to RasterImage (no re-dithering)
+    mono = scaled.convert("1")
+    width, height = mono.size
+    _get = getattr(mono, "get_flattened_data", mono.getdata)
+    pixel_data = list(_get())
+    rows = [
+        [pixel_data[y * width + x] == 0 for x in range(width)]
+        for y in range(height)
+    ]
+    try:
+        raster = RasterImage.from_rows(rows)
+    except ValueError as error:
+        raise SystemExit(f"cannot build raster: {error}") from error
+
+    preview = mono.convert("L")
+    return preview, raster, dps
+
+
+def _halftone_qr_summary(
+    raster: RasterImage,
+    dps: int,
+    preview: str | None = None,
+) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "width": raster.width,
+        "height": raster.height,
+        "dots_per_subpixel": dps,
+        "code_esc_frame_bytes": len(protocol.encode_compressed_raster(raster)),
+    }
+    if preview:
+        summary["preview"] = preview
+    return summary
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tronic-printer")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -439,6 +577,28 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="confirm that moving paper is allowed",
     )
+
+    prepare_hqr = subparsers.add_parser(
+        "prepare-halftone-qr",
+        help="render a halftone QR code and save a preview PNG without hardware access",
+    )
+    _add_halftone_qr_options(prepare_hqr)
+    prepare_hqr.add_argument("--output", "-o", required=True, help="destination PNG preview")
+
+    ble_hqr = subparsers.add_parser(
+        "ble-print-halftone-qr",
+        help="render and print a halftone QR code over BLE",
+    )
+    ble_hqr.add_argument("address")
+    ble_hqr.add_argument("--live", action="store_true", help="confirm physical Bluetooth access")
+    ble_hqr.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
+    )
+    _add_halftone_qr_options(ble_hqr)
+    ble_hqr.add_argument("--preview", help="save the exact one-bit raster PNG before connecting")
+    _add_print_options(ble_hqr)
 
     for name in ("info", "probe-info", "print-test", "print-image", "print-text", "print-html"):
         command = subparsers.add_parser(name)
@@ -653,6 +813,41 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, TimeoutError) as error:
             raise SystemExit(f"BLE feed failed: {error}") from error
         _print_json({"fed_dots": args.dots, "fed_mm": args.dots / 8})
+        return 0
+
+    if args.action == "prepare-halftone-qr":
+        preview_img, raster, dps = _prepare_halftone_qr_or_exit(args)
+        try:
+            preview_img.save(args.output)
+        except OSError as error:
+            raise SystemExit(f"cannot save preview: {error}") from error
+        _print_json(_halftone_qr_summary(raster, dps, preview=str(Path(args.output))))
+        return 0
+
+    if args.action == "ble-print-halftone-qr":
+        _require(args.live, "refusing Bluetooth connection without --live")
+        _require(args.allow_printing, "refusing to print without --allow-printing")
+        preview_img, raster, dps = _prepare_halftone_qr_or_exit(args)
+        if getattr(args, "preview", None):
+            try:
+                preview_img.save(args.preview)
+            except OSError as error:
+                raise SystemExit(f"cannot save preview: {error}") from error
+        try:
+            with BleTransport(args.address) as transport:
+                result = build_application(transport).commands.execute(
+                    PrintRaster(
+                        raster,
+                        feed_dots=args.feed_dots,
+                        encoding=RasterEncoding(args.encoding),
+                    )
+                )
+        except (OSError, TimeoutError) as error:
+            raise SystemExit(f"BLE print failed: {error}") from error
+        values = asdict(result)
+        values["completion"] = result.completion.hex(" ")
+        values["halftone_qr"] = _halftone_qr_summary(raster, dps)
+        _print_json(values)
         return 0
 
     if args.action == "print-image":

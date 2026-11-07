@@ -331,6 +331,63 @@ def _barcode_helper() -> Callable[..., str]:
     return barcode
 
 
+def _halftone_qr_code_helper(root: Path) -> Callable[..., str]:
+    def halftone_qr_code(
+        text: object,
+        image_path: str,
+        *,
+        grid: int = 6,
+        core: int = 2,
+        dither: str = "floyd-steinberg",
+        error_level: str = "h",
+        marks: str = "all",
+        border: int = 4,
+        contrast: float = 1.0,
+        brightness: float = 1.0,
+        invert: bool = False,
+        mask: int | None = None,
+    ) -> str:
+        """Generate a halftone QR code as an embedded PNG data URI.
+
+        The *image_path* must be a path relative to the template directory.
+        The returned PNG is sized to the nearest fit in 384 printer dots.
+        """
+        from tronic_printer.halftone_qr import (
+            HalftoneDither,
+            HalftoneOptions,
+            MarksMode,
+            halftone_qr_to_raster,
+            render_halftone_qr,
+        )
+
+        content = str(text)
+        if not content:
+            raise ValueError("halftone_qr_code: text cannot be empty")
+        asset = _resolve_asset(root, image_path)
+        options = HalftoneOptions(
+            grid=grid,
+            core=core,
+            dither=HalftoneDither(dither),
+            error_level=error_level,
+            marks=MarksMode(marks),
+            border=border,
+            contrast=contrast,
+            brightness=brightness,
+            invert=invert,
+            mask=mask,
+        )
+        with Image.open(asset) as img:
+            img.load()
+            rendered = render_halftone_qr(content, img, options)
+        scaled, _dps = halftone_qr_to_raster(rendered)
+        output = io.BytesIO()
+        scaled.convert("L").save(output, format="PNG", optimize=True)
+        encoded = base64.b64encode(output.getvalue()).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+
+    return halftone_qr_code
+
+
 def render_template(template_path: str | Path, data: Mapping[str, Any] | None = None) -> str:
     """Render one sandboxed Jinja template rooted at its own directory."""
 
@@ -373,6 +430,7 @@ def render_template(template_path: str | Path, data: Mapping[str, Any] | None = 
     environment.globals["printer_image"] = _printer_image_helper(root)
     environment.globals["qr_code"] = _qr_code_helper()
     environment.globals["barcode"] = _barcode_helper()
+    environment.globals["halftone_qr_code"] = _halftone_qr_code_helper(root)
     try:
         return environment.get_template(source.name).render(dict(data or {}))
     except TemplateError as error:

@@ -51,6 +51,7 @@ The findings are documented in:
 - [Image preprocessing and effect plugins](docs/image-preprocessing.md)
 - [Unicode text and font support](docs/text-printing.md)
 - [HTML receipt templates](docs/html-templating.md)
+- [Halftone QR codes](docs/halftone-qr.md)
 - [Optional protocol experiments](docs/protocol-experiments.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)

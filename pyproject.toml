@@ -29,6 +29,7 @@ dev = [
     "pytest-cov>=5,<8",
     "ruff>=0.9,<1",
     "segno>=1.6,<2",
+    "zxing-cpp>=2.2,<3",
 ]
 html = [
     "playwright>=1.50,<2",
