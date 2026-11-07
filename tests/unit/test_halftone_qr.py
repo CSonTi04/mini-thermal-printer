@@ -18,6 +18,7 @@ from tronic_printer.halftone_qr import (
     _build_functional_mask,
     _dither_background,
     halftone_qr_to_raster,
+    prepare_halftone_qr,
     render_halftone_qr,
 )
 
@@ -308,6 +309,72 @@ class TestHalftoneQrToRaster:
             halftone_qr_to_raster(big, max_width=384)
 
 
+class TestPrepareHalftoneQr:
+    def test_raster_is_full_width_and_code_is_centred(self) -> None:
+        prepared = prepare_halftone_qr("centre", _gradient_image(), HalftoneOptions(grid=3, core=1))
+        assert prepared.raster.width == 384
+        assert prepared.preview.size == (384, prepared.raster.height)
+        assert prepared.code_width == prepared.raster.height
+        left = (384 - prepared.code_width) // 2
+        rendered = render_halftone_qr("centre", _gradient_image(), HalftoneOptions(grid=3, core=1))
+        dps = prepared.dots_per_subpixel
+        # Every printer dot equals its source subpixel: no smoothing/re-dither.
+        src = rendered.convert("L").load()
+        dst = prepared.preview.load()
+        for y in range(prepared.raster.height):
+            for x in range(384):
+                if left <= x < left + prepared.code_width:
+                    expected = src[(x - left) // dps, y // dps]
+                else:
+                    expected = 255
+                assert dst[x, y] == expected, (x, y)
+
+    def test_raster_matches_preview(self) -> None:
+        prepared = prepare_halftone_qr("r", _gradient_image(), HalftoneOptions(grid=3, core=1))
+        pix = prepared.preview.load()
+        row_bytes = prepared.raster.width // 8
+        for y in range(0, prepared.raster.height, 7):
+            for x in range(0, 384, 5):
+                byte = prepared.raster.data[y * row_bytes + x // 8]
+                bit = bool(byte & (0x80 >> (x % 8)))
+                assert bit == (pix[x, y] == 0), (x, y)
+
+    def test_transparent_background_is_white_not_black(self) -> None:
+        clear = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        opts = HalftoneOptions(grid=3, core=1, marks=MarksMode.NONE, border=0)
+        result = render_halftone_qr("alpha", clear, opts).convert("L")
+        is_dark_qr, _ = _get_qr_matrix("alpha", "h")
+        pix = result.load()
+        # Non-core subpixel (0,0) of every module is background → must be white.
+        for r in range(len(is_dark_qr)):
+            for c in range(len(is_dark_qr)):
+                assert pix[c * 3, r * 3] == 255, (r, c)
+
+    def test_atkinson_mid_grey_is_roughly_balanced(self) -> None:
+        result = _dither_background(_solid_image(128, size=32), HalftoneDither.ATKINSON)
+        blacks = sum(v for row in result for v in row)
+        assert 0.3 < blacks / 1024 < 0.7
+
+
+def test_html_helper_respects_width(tmp_path: Path) -> None:
+    import base64
+    import io
+
+    from tronic_printer.html_template import render_template
+
+    _gradient_image(64).save(tmp_path / "bg.png")
+    template = tmp_path / "t.html"
+    template.write_text(
+        '{{ halftone_qr_code("hi", "bg.png", width=352, grid=3, core=1) }}',
+        encoding="utf-8",
+    )
+    uri = render_template(template).strip()
+    png = base64.b64decode(uri.split(",", 1)[1])
+    with Image.open(io.BytesIO(png)) as image:
+        assert image.width <= 352
+        assert set(image.convert("L").tobytes()) <= {0, 255}
+
+
 # ---------------------------------------------------------------------------
 # ZXing decode – QR must be scannable for every preset
 # ---------------------------------------------------------------------------
@@ -405,7 +472,23 @@ def test_prepare_halftone_qr_cli(
     summary = json.loads(capsys.readouterr().out)
     assert summary["width"] > 0
     assert summary["dots_per_subpixel"] >= 1
+    assert summary["width"] == 384
     assert "preview" in summary
+
+
+def test_prepare_halftone_qr_cli_preset_overrides_grid(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    img_path = tmp_path / "bg.png"
+    _gradient_image(64).save(img_path)
+    rc = cli.main([
+        "prepare-halftone-qr", "--data", "hi", "--image", str(img_path),
+        "--preset", "5/3", "--output", str(tmp_path / "p.png"),
+    ])
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert (summary["grid"], summary["core"]) == (5, 3)
 
 
 def test_prepare_halftone_qr_all_dithers(

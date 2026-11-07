@@ -336,6 +336,7 @@ def _halftone_qr_code_helper(root: Path) -> Callable[..., str]:
         text: object,
         image_path: str,
         *,
+        width: int = MAX_PRINT_WIDTH,
         grid: int = 6,
         core: int = 2,
         dither: str = "floyd-steinberg",
@@ -350,8 +351,15 @@ def _halftone_qr_code_helper(root: Path) -> Callable[..., str]:
         """Generate a halftone QR code as an embedded PNG data URI.
 
         The *image_path* must be a path relative to the template directory.
-        The returned PNG is sized to the nearest fit in 384 printer dots.
+        The returned PNG is integer-scaled (nearest neighbour) to the largest
+        size that fits *width* dots.  Pass the width of the containing box
+        (e.g. 352 inside a ``receipt--padded`` body) so the browser never
+        resamples the one-bit halftone.
         """
+        if not isinstance(width, int) or not 1 <= width <= MAX_PRINT_WIDTH:
+            raise ValueError(
+                f"halftone_qr_code: width must be an integer between 1 and {MAX_PRINT_WIDTH}"
+            )
         from tronic_printer.halftone_qr import (
             HalftoneDither,
             HalftoneOptions,
@@ -379,7 +387,7 @@ def _halftone_qr_code_helper(root: Path) -> Callable[..., str]:
         with Image.open(asset) as img:
             img.load()
             rendered = render_halftone_qr(content, img, options)
-        scaled, _dps = halftone_qr_to_raster(rendered)
+        scaled, _dps = halftone_qr_to_raster(rendered, max_width=width)
         output = io.BytesIO()
         scaled.convert("L").save(output, format="PNG", optimize=True)
         encoded = base64.b64encode(output.getvalue()).decode("ascii")

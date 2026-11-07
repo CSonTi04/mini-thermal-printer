@@ -47,6 +47,9 @@ flowchart LR
   performs measured Unicode wrapping and alignment, and produces the same
   prepared raster contract as the image pipeline. It has no transport or
   hardware dependency.
+- `halftone_qr.py` renders halftone QR codes (Segno matrix plus a dithered
+  background) and returns the same raster-plus-exact-preview contract, using
+  integer nearest-neighbour scaling only. It has no transport dependency.
 - `infrastructure/serial.py` implements classic RFCOMM/SPP through a Windows or
   Linux serial device. Writes follow the official app's 16,384-byte limit.
 - `infrastructure/ble.py` provides passive discovery, metadata-only GATT

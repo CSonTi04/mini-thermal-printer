@@ -12,17 +12,23 @@ HalftoneDither  – dither algorithm for the background image
 MarksMode       – which structural modules to render solid
 HalftoneOptions – frozen, validated configuration dataclass
 render_halftone_qr(data, image, options) → PIL.Image  (mode "1")
+prepare_halftone_qr(data, image, options, width=384) → PreparedHalftoneQr
+    (RasterImage + exact preview, integer nearest-neighbour scaled, centred)
 """
 
 from __future__ import annotations
 
-import io
 import warnings
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Final
 
 from PIL import Image, ImageEnhance, ImageOps
+
+from tronic_printer.domain import RasterImage
+from tronic_printer.preprocessing import _normalize_source
+from tronic_printer.protocol import MAX_PRINT_WIDTH
 
 # ---------------------------------------------------------------------------
 # Public enums
@@ -238,18 +244,21 @@ def _dither_background(gray: Image.Image, dither: HalftoneDither) -> list[list[b
         ]
 
     if dither is HalftoneDither.ATKINSON:
-        buf = list(_safe_getdata(gray))
+        # Float buffer: integer floor division would bias negative error
+        # (dark pixels) and darken the background.  Atkinson deliberately
+        # diffuses only 6/8 of the error, and the buffer is not clamped.
+        buf = [float(value) for value in _safe_getdata(gray)]
         result = [[False] * w for _ in range(h)]
         for y in range(h):
             for x in range(w):
                 old = buf[y * w + x]
-                new = 0 if old < 128 else 255
-                result[y][x] = new == 0
-                err = (old - new) // 8
+                new = 0.0 if old < 128 else 255.0
+                result[y][x] = new == 0.0
+                err = (old - new) / 8
                 for dy, dx in ((0, 1), (0, 2), (1, -1), (1, 0), (1, 1), (2, 0)):
                     ny, nx = y + dy, x + dx
                     if 0 <= ny < h and 0 <= nx < w:
-                        buf[ny * w + nx] = max(0, min(255, buf[ny * w + nx] + err))
+                        buf[ny * w + nx] += err
         return result
 
     raise ValueError(f"unsupported dither mode: {dither}")
@@ -261,10 +270,9 @@ def _prepare_background(
     options: HalftoneOptions,
 ) -> list[list[bool]]:
     """Grayscale + cover-crop to *size*×*size*, adjust, dither → bool grid."""
-    gray = ImageOps.grayscale(image)
-
-    # EXIF orientation
-    gray = ImageOps.exif_transpose(gray)  # type: ignore[assignment]
+    # Shared normalisation: EXIF orientation first, transparency flattened
+    # onto white (otherwise transparent pixels would turn black), greyscale.
+    gray = _normalize_source(image)
 
     # Cover-fit crop: scale so smaller dimension fills *size*, then centre-crop
     w, h = gray.size
@@ -329,19 +337,9 @@ def render_halftone_qr(
     code = segno.make_qr(text, error=options.error_level, mask=mask_param)
     version: int = code.version  # type: ignore[assignment]
 
-    # Render QR to a 1-bit grayscale PNG (no border) to get the pixel matrix
-    buf = io.BytesIO()
-    code.save(buf, kind="png", scale=1, border=0, dark="black", light="white")
-    buf.seek(0)
-    with Image.open(buf) as qr_png:
-        qr_size: int = qr_png.width  # always square
-        qr_luminance = _safe_getdata(qr_png.convert("L"))
-
-    # is_dark[r][c] – True means black QR module
-    is_dark: list[list[bool]] = [
-        [qr_luminance[r * qr_size + c] < 128 for c in range(qr_size)]
-        for r in range(qr_size)
-    ]
+    # is_dark[r][c] – True means black QR module (segno matrix, no border)
+    is_dark: list[list[bool]] = [[bool(value) for value in row] for row in code.matrix]
+    qr_size = len(is_dark)
 
     # --- Functional-module mask ---------------------------------------------
     functional = _build_functional_mask(qr_size, version, options.marks)
@@ -400,8 +398,6 @@ def render_halftone_qr(
 
 def _warn_if_tiny(total_subpixels: int, grid: int) -> None:
     """Emit a warning when each module would be very small at 384-dot width."""
-    from tronic_printer.protocol import MAX_PRINT_WIDTH
-
     dps = MAX_PRINT_WIDTH // total_subpixels  # dots per subpixel
     module_dots = dps * grid
     if dps < 1:
@@ -426,7 +422,7 @@ def _warn_if_tiny(total_subpixels: int, grid: int) -> None:
 def halftone_qr_to_raster(
     rendered: Image.Image,
     *,
-    max_width: int = 384,
+    max_width: int = MAX_PRINT_WIDTH,
 ) -> tuple[Image.Image, int]:
     """Scale *rendered* to fit *max_width* (nearest-neighbour) and return
     ``(scaled_pil_image, dots_per_subpixel)``.
@@ -443,3 +439,73 @@ def halftone_qr_to_raster(
     side = total_subpixels * dps
     scaled = rendered.resize((side, side), Image.Resampling.NEAREST)
     return scaled, dps
+
+
+# ---------------------------------------------------------------------------
+# Printer preparation: the same "raster + exact preview" contract as images
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, slots=True)
+class PreparedHalftoneQr:
+    """A halftone QR code laid out on a full printer-width raster."""
+
+    raster: RasterImage
+    preview: Image.Image
+    code_width: int
+    dots_per_subpixel: int
+    grid: int
+    core: int
+
+    @property
+    def module_dots(self) -> int:
+        return self.dots_per_subpixel * self.grid
+
+    def save_preview(self, path: str | Path) -> None:
+        self.preview.save(path)
+
+    def summary(self) -> dict[str, object]:
+        return {
+            "width": self.raster.width,
+            "height": self.raster.height,
+            "code_width": self.code_width,
+            "dots_per_subpixel": self.dots_per_subpixel,
+            "module_dots": self.module_dots,
+            "grid": self.grid,
+            "core": self.core,
+            "raster_bytes": len(self.raster.data),
+        }
+
+
+def prepare_halftone_qr(
+    data: object,
+    image: Image.Image,
+    options: HalftoneOptions | None = None,
+    *,
+    width: int = MAX_PRINT_WIDTH,
+) -> PreparedHalftoneQr:
+    """Render, integer-scale (nearest neighbour) and centre a halftone QR code.
+
+    The result is exactly *width* dots wide.  The one-bit halftone is never
+    resampled with smoothing or dithered again: each subpixel becomes an
+    exact ``dots_per_subpixel`` square of printer dots.
+    """
+    if not 1 <= width <= MAX_PRINT_WIDTH:
+        raise ValueError(f"width must be between 1 and {MAX_PRINT_WIDTH} dots")
+    options = options or HalftoneOptions()
+    rendered = render_halftone_qr(data, image, options)
+    scaled, dps = halftone_qr_to_raster(rendered, max_width=width)
+    canvas = Image.new("1", (width, scaled.height), 1)
+    canvas.paste(scaled, ((width - scaled.width) // 2, 0))
+    values = _safe_getdata(canvas)
+    rows = [
+        [values[y * width + x] == 0 for x in range(width)]
+        for y in range(canvas.height)
+    ]
+    return PreparedHalftoneQr(
+        raster=RasterImage.from_rows(rows),
+        preview=canvas.convert("L"),
+        code_width=scaled.width,
+        dots_per_subpixel=dps,
+        grid=options.grid,
+        core=options.core,
+    )

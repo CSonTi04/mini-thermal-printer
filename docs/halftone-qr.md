@@ -39,7 +39,8 @@ Inspiration and reference implementation:
 | Flag / parameter | Type | Default | Description |
 |---|---|---|---|
 | `--grid N` | int 2–10 | `6` | Subpixels per module side |
-| `--core C` | int 1–N-1 | `2` | Solid core size (N × N cell) |
+| `--core C` | int 1–N-1 | `2` | Solid core size (C × C inside the N × N cell) |
+| `--preset` | 3/1, 5/1, 5/3, 6/2 | – | Named grid/core pair; overrides `--grid`/`--core` |
 | `--dither` | str | `floyd-steinberg` | Background dither algorithm |
 | `--error-level` | l/m/q/h | `h` | QR error correction level |
 | `--marks` | all/finders/none | `all` | Which structural modules to render solid |
@@ -81,11 +82,19 @@ Inspiration and reference implementation:
   pixels in non-core positions degrade the QR signal; high redundancy
   compensates.
 - **Grid 6, core 2** (the default) gives each module 36 subpixels with a
-  4-subpixel solid core. At 384 printer dots, a version-5 "h" QR fits at
-  3 dots per subpixel (18 dots per module) — very readable.
+  4-subpixel solid core. Every subpixel becomes an exact integer square of
+  printer dots (nearest-neighbour, never re-dithered), so the printed size is
+  `(modules + 2 × border) × grid × dots_per_subpixel`. With the default
+  border of 4, a version-1 code (21 modules) at 6/2 is 174 subpixels → 2 dots
+  per subpixel (348 dots, 12 dots per module); a version-2 code (25 modules)
+  is 198 subpixels → only 1 dot per subpixel (198 dots, 6 dots per module).
+  The `3/1` preset fits version 1 at 4 and versions 2–4 at 3 dots per
+  subpixel.
 - **Large QR versions** (high version number) reduce the dots-per-subpixel.
-  Shorter data or lower error levels produce smaller QR codes that scale
-  better.
+  Shorter data, a smaller `--grid`, a smaller `--border`, or a lower error
+  level produce codes that scale better. The JSON summary reports
+  `dots_per_subpixel`, `module_dots` and `code_width`.
+- The printed raster is always 384 dots wide with the code centred.
 - **Contrast boost** (`--contrast 1.5`) sharpens the dithered image; combined
   with `--error-level h` and `--marks all` this gives the best balance of
   image quality and scan reliability.
@@ -120,19 +129,40 @@ tronic-printer ble-print-halftone-qr AA:BB:CC:DD:EE:FF \
 Add a halftone QR to any Jinja receipt template:
 
 ```jinja
-{{ halftone_qr_code(
+<img class="machine-code" alt="" src="{{ halftone_qr_code(
        "https://example.com",
        "photo.jpg",
+       width=352,
        grid=6,
        core=2,
        error_level="h",
        marks="all",
        contrast=1.3
-   ) | safe }}
+   ) }}">
 ```
 
-The helper returns a `data:image/png;base64,…` URI that can be dropped
-directly into an `<img>` tag or used as a CSS `background-image`.
+The helper returns a `data:image/png;base64,…` URI for an `<img>` tag. The
+image path must be relative to the template directory. Set `width` to the
+content-box width that will hold the image (352 inside a 16 px padded
+receipt, 384 for a full-bleed body): the PNG is integer-scaled to fit it, so
+the browser displays it at its natural size and never resamples the one-bit
+halftone. The `machine-code` class adds `image-rendering: pixelated` and
+centres the image.
+
+## Library usage
+
+```python
+from PIL import Image
+from tronic_printer.halftone_qr import HalftoneOptions, prepare_halftone_qr
+
+with Image.open("photo.jpg") as photo:
+    prepared = prepare_halftone_qr("https://example.com", photo, HalftoneOptions())
+prepared.save_preview("preview.png")   # exact one-bit print preview
+raster = prepared.raster               # RasterImage for PrintRaster
+```
+
+`render_halftone_qr()` returns the unscaled one-bit image at subpixel
+resolution if you need to place it yourself.
 
 ## Attribution
 
