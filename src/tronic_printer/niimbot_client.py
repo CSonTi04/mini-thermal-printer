@@ -3,13 +3,12 @@
 The wire framing and row primitives live in :mod:`tronic_printer.niimbot`. This
 module adds the request/response layer on top of the same synchronous
 :class:`~tronic_printer.ports.PrinterTransport` port used by the other printers,
-so it works over USB CDC serial (verified for the query path) or any other
+so it works over USB CDC serial (verified for queries and print jobs) or any other
 transport that carries NIIMBOT frames.
 
-Evidence labels follow the rest of the project: the query commands and their
-responses were *Verified* against a physical B1 over USB at 115200 baud. The
-print sequence is *Recovered* from the upstream community protocol and must be
-treated as *Inferred* until a physical print has been recorded.
+Evidence labels follow the rest of the project: the query commands and print-job
+lifecycle were *Verified* against a physical B1 over USB at 115200 baud and over
+BLE. Some details (for example long-job BLE pacing) remain *Recovered* / *Unknown*.
 """
 
 from __future__ import annotations
