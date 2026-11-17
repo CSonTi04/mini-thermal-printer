@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 
 from tronic_printer import protocol
+from tronic_printer.niimbot import NiimbotFrameBuffer, NiimbotPacket
 
 
 class ScriptedTransport:
@@ -128,3 +129,152 @@ class EmulatedPrinterTransport:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+class EmulatedNiimbotTransport:
+    """Stateful NIIMBOT B1 emulator.
+
+    Query answers mirror a physical B1 observed over USB. The print flow follows the
+    upstream protocol and is strict: it rebuilds the page from row packets and checks
+    each row's black-pixel counts, so encoding mistakes fail in tests.
+    """
+
+    _INFO_KEYS = (1, 3, 7, 8, 9, 10, 11, 12)
+
+    def __init__(
+        self,
+        *,
+        device_type: int = 4096,
+        software: int = 0x0613,
+        hardware: int = 0x0601,
+        serial_number: str = "I612120126",
+        battery: int = 4,
+        density: int = 3,
+        label_type: int = 3,
+        rejected: frozenset[int] = frozenset(),
+        errors: frozenset[int] = frozenset(),
+        lid_open: bool = False,
+        paper_out: bool = False,
+        status_polls_until_done: int = 2,
+    ) -> None:
+        self._info = {
+            1: bytes((density,)),
+            3: bytes((label_type,)),
+            7: b"\x03",
+            8: device_type.to_bytes(2, "big"),
+            9: software.to_bytes(2, "big"),
+            10: bytes((battery,)),
+            11: serial_number.encode("ascii"),
+            12: hardware.to_bytes(2, "big"),
+        }
+        self.rejected = rejected
+        self.errors = errors  # commands the printer answers with an 0xDB error packet
+        self.lid_open = lid_open
+        self.paper_out = paper_out
+        self.status_polls_until_done = status_polls_until_done
+        self.commands: list[int] = []
+        self.payloads: dict[int, bytes] = {}
+        self.rows: dict[int, bytes] = {}
+        self.row_packets: list[NiimbotPacket] = []
+        self.page_rows = 0
+        self.page_cols = 0
+        self.closed = False
+        self._status_polls = 0
+        self._stream = NiimbotFrameBuffer()
+        self._replies = bytearray()
+
+    # -- transport port ----------------------------------------------------------------------
+
+    def write(self, payload: bytes) -> None:
+        if self.closed:
+            raise OSError("transport is closed")
+        for packet in self._stream.feed(bytes(payload)):
+            self._handle(packet)
+
+    def exchange(self, payload: bytes, **_options: object) -> bytes:
+        self._replies.clear()  # like reset_input_buffer() on the real serial transport
+        self.write(payload)
+        if not self._replies:
+            raise TimeoutError("printer response timed out")
+        return bytes(self._replies)
+
+    def drain_replies(self) -> bytes:
+        """Bytes the printer has answered since the last call (emulates BLE notifications)."""
+        replies = bytes(self._replies)
+        self._replies.clear()
+        return replies
+
+    def close(self) -> None:
+        self.closed = True
+
+    def __enter__(self) -> EmulatedNiimbotTransport:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    # -- emulation ---------------------------------------------------------------------------
+
+    @property
+    def bitmap(self) -> bytes:
+        """The page reconstructed from row packets; fails if any row is missing."""
+        missing = [i for i in range(self.page_rows) if i not in self.rows]
+        assert not missing, f"rows never sent: {missing[:5]}"
+        return b"".join(self.rows[i] for i in range(self.page_rows))
+
+    def _reply(self, command: int, payload: bytes) -> None:
+        self._replies.extend(NiimbotPacket(command, payload).to_bytes())
+
+    def _handle(self, packet: NiimbotPacket) -> None:
+        command, payload = packet.command, packet.payload
+        if command in (0x84, 0x85):
+            self._store_row(packet)
+            return
+        self.commands.append(command)
+        self.payloads[command] = payload
+        if command in self.errors:
+            self._reply(0xDB, b"\x01")
+        elif command == 0x40:
+            key = payload[0]
+            if key in self._INFO_KEYS:
+                self._reply(0x40 + key, self._info[key])
+            else:
+                self._reply(0x00, b"\x01")  # unsupported key, as on hardware
+        elif command == 0xDC:
+            beat = bytearray.fromhex("207d0064006400004a00040000")
+            beat[9], beat[11] = int(self.lid_open), int(self.paper_out)
+            self._reply(0xDD, bytes(beat))
+        elif command == 0xA3:
+            self._status_polls += 1
+            done = self._status_polls > self.status_polls_until_done
+            progress = (0, 1, 100, 100) if done else (0, 0, 40, 40)
+            self._reply(0xB3, bytes(progress))
+        elif command in (0x01, 0x03, 0x13, 0x21, 0x23, 0xE3, 0xF3):
+            if command == 0x13:
+                self.page_rows = int.from_bytes(payload[0:2], "big")
+                self.page_cols = int.from_bytes(payload[2:4], "big")
+            self._reply(
+                {0x21: 0x31, 0x23: 0x33}.get(command, command + 1),
+                b"\x00" if command in self.rejected else b"\x01",
+            )
+        else:
+            raise AssertionError(f"unsupported NIIMBOT emulator command: 0x{command:02X}")
+
+    def _store_row(self, packet: NiimbotPacket) -> None:
+        self.row_packets.append(packet)
+        payload = packet.payload
+        index = int.from_bytes(payload[0:2], "big")
+        row_bytes = self.page_cols // 8
+        if packet.command == 0x84:
+            repeat, data = payload[2], bytes(row_bytes)
+        else:
+            repeat, data = payload[5], payload[6:]
+            assert len(data) == row_bytes, f"row {index} has {len(data)} bytes, want {row_bytes}"
+            step = -(-row_bytes // 3)
+            expected = [
+                sum(b.bit_count() for b in data[i : i + step]) for i in range(0, row_bytes, step)
+            ]
+            assert list(payload[2:5]) == expected, f"row {index} black counts are wrong"
+            assert any(data), f"blank row {index} must use the empty-row command"
+        for offset in range(repeat):
+            self.rows[index + offset] = data

@@ -8,7 +8,7 @@ from tronic_printer import cli
 from tronic_printer.html_template import PreparedHtml
 from tronic_printer.infrastructure.ble import BleDevice
 from tronic_printer.preprocessing import ImagePreparationConfig, prepare_image
-from tronic_printer.testing import EmulatedPrinterTransport
+from tronic_printer.testing import EmulatedNiimbotTransport, EmulatedPrinterTransport
 
 
 def test_ports_is_read_only_and_json_formatted(
@@ -151,10 +151,13 @@ def test_prepare_text_renders_unicode_font_preview_without_hardware(
     )
 
     output = json.loads(capsys.readouterr().out)
-    assert output["font"]["family"] == ImageFont.truetype(
-        unicode_font_path,
-        12,
-    ).getname()[0]
+    assert (
+        output["font"]["family"]
+        == ImageFont.truetype(
+            unicode_font_path,
+            12,
+        ).getname()[0]
+    )
     assert output["line_count"] == 2
     assert output["align"] == "center"
     assert preview.is_file()
@@ -316,6 +319,134 @@ def test_optional_probe_continues_after_unsupported_query(error: OSError) -> Non
 
     assert result["speed"] == {"supported": False, "error": str(error)}
     assert result["time_format"] == {"supported": True, "value": 0}
+
+
+def test_niimbot_info_is_live_gated_and_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    printer = EmulatedNiimbotTransport()
+    monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(["niimbot-info", "--port", "COM4"])
+    assert printer.commands == []
+
+    assert cli.main(["niimbot-info", "--port", "COM4", "--live"]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["model"] == "NIIMBOT B1"
+    assert output["label_type"] == 3
+    assert output["heartbeat"]["power_level"] == 4
+    assert set(printer.commands) <= {0x40, 0xDC}  # queries only, nothing that prints
+
+
+def test_niimbot_print_needs_both_flags_and_prints_the_prepared_image(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    printer = EmulatedNiimbotTransport()
+    monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)
+    image = tmp_path / "in.png"
+    Image.new("L", (384, 40), 0).save(image)
+    preview = tmp_path / "preview.png"
+    base = ["niimbot-print-image", str(image), "--port", "COM4", "--preview", str(preview)]
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(base)
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main([*base, "--live"])
+    assert printer.commands == []
+
+    assert cli.main([*base, "--live", "--allow-printing", "--feed-rows", "8"]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert (result["width"], result["height"], result["rows"]) == (384, 40, 48)
+    assert preview.is_file()
+    assert printer.commands[-1] == 0xF3
+
+
+def test_niimbot_ble_selects_the_ble_transport_and_passes_the_address(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    opened: list[str] = []
+
+    def fake_ble(address: str) -> EmulatedNiimbotTransport:
+        opened.append(address)
+        return EmulatedNiimbotTransport()  # a fresh connection each time, as in real life
+
+    monkeypatch.setattr(cli, "NiimbotBleTransport", fake_ble)
+    monkeypatch.setattr(
+        cli, "SerialTransport", lambda *_a, **_k: pytest.fail("USB must not be opened")
+    )
+
+    assert cli.main(["niimbot-info", "--ble", "--live"]) == 0
+    assert json.loads(capsys.readouterr().out)["model"] == "NIIMBOT B1"
+    assert cli.main(["niimbot-info", "--ble", "12:06:12:F9:03:6A", "--live"]) == 0
+
+    assert opened == ["auto", "12:06:12:F9:03:6A"]
+
+
+def test_niimbot_needs_exactly_one_of_port_or_ble() -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["niimbot-info", "--live"])
+    with pytest.raises(SystemExit):
+        cli.main(["niimbot-info", "--port", "COM4", "--ble", "--live"])
+
+
+def test_niimbot_ble_print_keeps_both_consent_gates_and_reports_a_missing_printer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def not_found(_address: str) -> None:
+        raise OSError("NIIMBOT B1 not found over BLE")
+
+    monkeypatch.setattr(cli, "NiimbotBleTransport", not_found)
+    image = tmp_path / "in.png"
+    Image.new("L", (384, 8), 0).save(image)
+    base = ["niimbot-print-image", str(image), "--ble"]
+
+    with pytest.raises(SystemExit, match="--live"):
+        cli.main(base)
+    with pytest.raises(SystemExit, match="--allow-printing"):
+        cli.main([*base, "--live"])
+    with pytest.raises(SystemExit, match="NIIMBOT print failed: NIIMBOT B1 not found"):
+        cli.main([*base, "--live", "--allow-printing"])
+
+
+def test_niimbot_ble_scan_lists_only_b1_advertisements(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    seen: dict[str, object] = {}
+
+    async def fake_discover(timeout: float, name_prefix: str) -> list[BleDevice]:
+        seen.update(timeout=timeout, prefix=name_prefix)
+        return [BleDevice(name="B1-I612120126", address="12:06:12:F9:03:6A", rssi=-54)]
+
+    monkeypatch.setattr(cli, "discover", fake_discover)
+
+    assert cli.main(["niimbot-ble-scan", "--timeout", "2"]) == 0
+
+    assert seen == {"timeout": 2.0, "prefix": "B1-"}
+    assert json.loads(capsys.readouterr().out)[0]["address"] == "12:06:12:F9:03:6A"
+
+
+def test_niimbot_print_reports_printer_trouble_without_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    printer = EmulatedNiimbotTransport(rejected=frozenset({0x01}))
+    monkeypatch.setattr(cli, "SerialTransport", lambda *_args, **_kwargs: printer)
+    image = tmp_path / "in.png"
+    Image.new("L", (384, 8), 0).save(image)
+
+    with pytest.raises(SystemExit, match="NIIMBOT print failed"):
+        cli.main(
+            ["niimbot-print-image", str(image), "--port", "COM4", "--live", "--allow-printing"]
+        )
 
 
 def test_print_requires_separate_consent(monkeypatch: pytest.MonkeyPatch) -> None:

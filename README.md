@@ -53,6 +53,7 @@ The findings are documented in:
 - [HTML receipt templates](docs/html-templating.md)
 - [Halftone QR codes](docs/halftone-qr.md)
 - [Optional protocol experiments](docs/protocol-experiments.md)
+- [NIIMBOT B1 support](docs/niimbot.md)
 - [Raspberry Pi native Linux HIL stage](docs/rpi-hil.md)
 - [Driver architecture](docs/architecture.md)
 - [Continuous integration and delivery](docs/ci-cd.md)
