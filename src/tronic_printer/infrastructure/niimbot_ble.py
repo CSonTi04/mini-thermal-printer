@@ -106,11 +106,14 @@ class NiimbotBleTransport:
             raise OSError("transport is closed")
         future = asyncio.run_coroutine_threadsafe(coroutine, self._loop)
         try:
-            return future.result(timeout=timeout)
         except BleakError as error:
             raise OSError(f"BLE error: {error}") from error
-        except TimeoutError:
-            future.cancel()
+        except Exception as error:
+            import concurrent.futures
+
+            if isinstance(error, (TimeoutError, concurrent.futures.TimeoutError)):
+                future.cancel()
+                raise TimeoutError(str(error)) from error
             raise
 
     # -- connection ------------------------------------------------------------------------
