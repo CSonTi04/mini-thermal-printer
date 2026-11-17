@@ -12,7 +12,7 @@ from typing import NoReturn
 
 from tronic_printer import protocol
 from tronic_printer.application import PrinterApplication, build_application
-from tronic_printer.domain import ProtocolError, RasterImage
+from tronic_printer.domain import PrinterError, ProtocolError, RasterImage
 from tronic_printer.halftone_qr import (
     PRESETS,
     HalftoneDither,
@@ -29,6 +29,8 @@ from tronic_printer.html_template import (
     prepare_html,
 )
 from tronic_printer.infrastructure.ble import BleTransport, discover, inspect_gatt
+from tronic_printer.infrastructure.niimbot_ble import NAME_PREFIX as NIIMBOT_NAME_PREFIX
+from tronic_printer.infrastructure.niimbot_ble import NiimbotBleTransport
 from tronic_printer.infrastructure.serial import SerialTransport, available_ports
 from tronic_printer.messages import (
     FeedPaper,
@@ -42,6 +44,7 @@ from tronic_printer.messages import (
     PrintResult,
     RasterEncoding,
 )
+from tronic_printer.niimbot_client import NiimbotClient
 from tronic_printer.preprocessing import (
     DitherMode,
     EffectSpec,
@@ -434,6 +437,75 @@ def _halftone_qr_summary(
     return summary
 
 
+def _add_niimbot_connection_options(parser: argparse.ArgumentParser) -> None:
+    link = parser.add_mutually_exclusive_group(required=True)
+    link.add_argument("--port", help="USB serial port of the NIIMBOT, e.g. COM4")
+    link.add_argument(
+        "--ble",
+        nargs="?",
+        const="auto",
+        metavar="ADDRESS",
+        help="use Bluetooth LE; without ADDRESS the first 'B1-*' device found is used",
+    )
+    parser.add_argument("--baudrate", type=int, default=115_200, help="USB serial only")
+    parser.add_argument("--live", action="store_true", help="confirm physical printer access")
+
+
+def _niimbot_transport(args: argparse.Namespace) -> SerialTransport | NiimbotBleTransport:
+    if args.ble is not None:
+        return NiimbotBleTransport(args.ble)
+    return SerialTransport(args.port, baudrate=args.baudrate)
+
+
+def _add_niimbot_print_options(parser: argparse.ArgumentParser) -> None:
+    _add_niimbot_connection_options(parser)
+    parser.add_argument(
+        "--allow-printing",
+        action="store_true",
+        help="confirm that activating the head and moving paper is allowed",
+    )
+    parser.add_argument("--density", type=int, default=3, help="print density from 1 to 5")
+    parser.add_argument(
+        "--label-type",
+        type=int,
+        help="paper type to send (default: keep the type the printer reports, e.g. 3 = continuous)",
+    )
+    parser.add_argument(
+        "--feed-rows",
+        type=int,
+        default=96,
+        help="blank rows appended so the print clears the tear bar",
+    )
+    parser.add_argument(
+        "--start-variant",
+        choices=("v3", "legacy"),
+        default="v3",
+        help="print-start/page-size payload style (see docs/niimbot.md)",
+    )
+    parser.add_argument("--preview", help="save the exact one-bit raster before connecting")
+
+
+def _niimbot_print(args: argparse.Namespace, prepared: PreparedImage | PreparedHtml) -> int:
+    _require(args.live, "refusing hardware access without --live")
+    _require(args.allow_printing, "refusing to print without --allow-printing")
+    raster = prepared.raster
+    if args.preview:
+        prepared.save_preview(args.preview)
+    try:
+        with _niimbot_transport(args) as transport:
+            result = NiimbotClient(transport).print_raster(
+                raster,
+                density=args.density,
+                label_type=args.label_type,
+                feed_rows=args.feed_rows,
+                start_variant=args.start_variant,
+            )
+    except (OSError, TimeoutError, PrinterError, ValueError) as error:
+        raise SystemExit(f"NIIMBOT print failed: {error}") from error
+    _print_json(asdict(result) | {"width": raster.width, "height": raster.height})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tronic-printer")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -482,6 +554,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = subparsers.add_parser("ble-scan", help="scan for matching BLE advertisements")
     scan.add_argument("--timeout", type=float, default=5.0)
+
+    niimbot_scan = subparsers.add_parser(
+        "niimbot-ble-scan", help="passively scan for NIIMBOT B1 advertisements ('B1-<serial>')"
+    )
+    niimbot_scan.add_argument("--timeout", type=float, default=5.0)
 
     gatt = subparsers.add_parser(
         "ble-gatt",
@@ -582,6 +659,19 @@ def build_parser() -> argparse.ArgumentParser:
     _add_halftone_qr_options(ble_hqr)
     ble_hqr.add_argument("--preview", help="save the exact one-bit raster PNG before connecting")
     _add_print_options(ble_hqr)
+
+    niimbot_info = subparsers.add_parser(
+        "niimbot-info", help="query a NIIMBOT B1 over USB serial or BLE (read-only)"
+    )
+    _add_niimbot_connection_options(niimbot_info)
+    niimbot_image = subparsers.add_parser("niimbot-print-image", help="print an image on a NIIMBOT")
+    _add_preparation_options(niimbot_image)
+    _add_niimbot_print_options(niimbot_image)
+    niimbot_html = subparsers.add_parser(
+        "niimbot-print-html", help="print an HTML receipt on a NIIMBOT"
+    )
+    _add_html_options(niimbot_html)
+    _add_niimbot_print_options(niimbot_html)
 
     for name in ("info", "probe-info", "print-test", "print-image", "print-text", "print-html"):
         command = subparsers.add_parser(name)
@@ -685,6 +775,13 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as error:
             raise SystemExit(f"BLE scan failed: {error}") from error
         _print_json([asdict(item) for item in devices])
+        return 0
+    if args.action == "niimbot-ble-scan":
+        try:
+            found = asyncio.run(discover(args.timeout, name_prefix=NIIMBOT_NAME_PREFIX))
+        except OSError as error:
+            raise SystemExit(f"BLE scan failed: {error}") from error
+        _print_json([asdict(item) for item in found])
         return 0
     if args.action == "ble-gatt":
         _require(args.live, "refusing Bluetooth connection without --live")
@@ -832,6 +929,25 @@ def main(argv: list[str] | None = None) -> int:
         values["halftone_qr"] = _halftone_qr_summary(prepared_qr)
         _print_json(values)
         return 0
+
+    if args.action == "niimbot-info":
+        _require(args.live, "refusing hardware access without --live")
+        try:
+            with _niimbot_transport(args) as transport:
+                client = NiimbotClient(transport)
+                info = client.device_info()
+                heartbeat = client.heartbeat()
+        except (OSError, TimeoutError, PrinterError) as error:
+            raise SystemExit(f"NIIMBOT query failed: {error}") from error
+        beat = asdict(heartbeat) | {"raw": heartbeat.raw.hex(" ")}
+        _print_json(asdict(info) | {"model": info.model, "heartbeat": beat})
+        return 0
+
+    if args.action == "niimbot-print-image":
+        return _niimbot_print(args, _prepare_image_or_exit(args))
+
+    if args.action == "niimbot-print-html":
+        return _niimbot_print(args, _prepare_html_or_exit(args))
 
     if args.action == "print-image":
         _require(args.live, "refusing hardware access without --live")
